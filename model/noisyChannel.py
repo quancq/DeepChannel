@@ -12,7 +12,7 @@ class ChannelModel(nn.Module):
         self.se_dim = kwargs['se_dim']  # dim of sentence embedding
         self.p_producer = nn.Sequential(
             nn.Dropout(kwargs['dropout']),
-            nn.Linear(self.se_dim * 3, 1024),
+            nn.Linear(self.se_dim * 3, 1024),   # Chú ý hệ số 3 (xem d_s_feat trong hàm forward)
             nn.ReLU(),
             nn.Linear(1024, 256),
             nn.ReLU(),
@@ -46,11 +46,11 @@ class ChannelModel(nn.Module):
 
         ## --------------------------------------------------------------- ##
         d_s_feat = torch.cat([D, att_S, torch.mul(D, att_S)], dim=1)
-        prob_vector = self.p_producer(d_s_feat)  # P(d|S) in each row
+        prob_vector = self.p_producer(d_s_feat)  # P(d_i|S) in each row, size = [n,1]
         ## --------------------------------------------------------------- ##
 
         # P(D|S) on the independent assumption. TODO: 0.5 trick not elegant;
-        log_prob = torch.sum(torch.log(0.5 + prob_vector))
+        log_prob = torch.sum(torch.log(0.5 + prob_vector))  # scalar
         addition = {
             'prob_vector': prob_vector,
             'att_weight': att_weight,
