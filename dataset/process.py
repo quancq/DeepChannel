@@ -86,13 +86,13 @@ def read_cnn_dailymail(data_type, data_dir):
         assert len(data_dir) == 2
         for i in range(2):
             key2File(data_dir[i], key2file)  # update key2file
-        prefix = './cnndaily_url_splits/all_'
+        prefix = './dataset/cnndaily_url_splits/all_'
     elif data_type == 'cnn':
         key2File(data_dir, key2file)
-        prefix = './cnndaily_url_splits/cnn_'
+        prefix = './dataset/cnndaily_url_splits/cnn_'
     elif data_type == 'daily':
         key2File(data_dir, key2file)
-        prefix = './cnndaily_url_splits/dailymail_'
+        prefix = './dataset/cnndaily_url_splits/dailymail_'
 
     for i, split in enumerate(['train', 'val', 'test']):
         url_file = prefix + split + '.txt'
@@ -150,7 +150,7 @@ def main():
         'duc2007': read_duc2007,
     }
     parser = argparse.ArgumentParser()
-    parser.add_argument('--glove', default='/data/sjx/glove.6B.100d.py36.pkl', help='pickle file of glove')
+    parser.add_argument('--glove', default='./word_embedding/glove/glove_gensim_300d.txt', help='glove gensim format path')
     parser.add_argument('--data', default='cnn+dailymail', choices=datasets.keys())
     parser.add_argument('--data-dir', default='/data/share/cnn_stories/stories;/data/share/dailymail_stories/stories',
                         help='If data=cnn+dailymail, then data-dir must contain two paths for cnn and dailymail seperated by ;.')
