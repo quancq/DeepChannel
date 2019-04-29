@@ -11,6 +11,7 @@ import copy
 import codecs
 import json
 from tqdm import tqdm
+import time
 from collections import Counter
 # from IPython import embed
 import xml.etree.ElementTree as et
@@ -143,6 +144,8 @@ def read_duc2007(data_type, data_dir):
 
 
 def main():
+    start_time = time.time()
+
     datasets = {
         'cnn+dailymail': read_cnn_dailymail,
         'cnn': read_cnn_dailymail,
@@ -270,6 +273,7 @@ def main():
     pickle.dump(itow, save_file)
     save_file.close()
 
+    print("Time: {:.2f}s".format(time.time() - start_time))
 
 if __name__ == "__main__":
     main()
