@@ -36,11 +36,14 @@ def rouge_atten_matrix(doc, summ):
 
 def trainChannelModel(args):
     np.set_printoptions(threshold=1e10)
+
     print('Loading data......')
     data = Dataset(path=args.data_path, fraction=args.fraction)
+
     print('Loading offline pyrouge max index.....')
     # the index of document sentence which has maximum pyrouge score with current summary sentence
     pyrouge_max_index = json.load(open(args.offline_pyrouge_index_json))
+
     print('Building model......')
     args.num_words = len(data.weight)  # number of words
     sentenceEncoder = SentenceEmbedding(**vars(args))
@@ -48,6 +51,7 @@ def trainChannelModel(args):
     channelModel = ChannelModel(**vars(args))
     logging.info(sentenceEncoder)
     logging.info(channelModel)
+
     print('Initializing word embeddings......')
     sentenceEncoder.word_embedding.weight.data.set_(data.weight)
     if not args.tune_word_embedding:
@@ -55,11 +59,12 @@ def trainChannelModel(args):
         print('Fix word embeddings')
     else:
         print('Tune word embeddings')
+
     device = torch.device('cuda' if args.cuda else 'cpu')
     if args.cuda:
         print('Transfer models to cuda......')
     sentenceEncoder, channelModel = sentenceEncoder.to(device), channelModel.to(device)
-    identityMatrix = torch.eye(100).to(device)
+    # identityMatrix = torch.eye(100).to(device)
 
     print('Initializing optimizer and summary writer......')
     params = [p for p in sentenceEncoder.parameters() if p.requires_grad] + \
@@ -71,6 +76,7 @@ def trainChannelModel(args):
     }[args.optimizer]
     optimizer = optimizer_class(params=params, lr=args.lr, weight_decay=args.weight_decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5, 10, 20, 30], gamma=0.5)
+
     train_writer = SummaryWriter(os.path.join(args.save_dir, 'log', 'train'))
     tic = time.time()
     iter_count = 0
@@ -84,7 +90,7 @@ def trainChannelModel(args):
         sentenceEncoder.load_state_dict(torch.load(os.path.join(args.save_dir, 'se.pkl')))
         channelModel.load_state_dict(torch.load(os.path.join(args.save_dir, 'channel.pkl')))
 
-    if (args.validation):
+    if args.validation:
         validate(data, sentenceEncoder, channelModel, device, args)
         return 0
     try:
@@ -95,10 +101,10 @@ def trainChannelModel(args):
     for epoch_num in range(args.max_epoch):
         scheduler.step()
         if args.anneal:
-            channelModel.temperature = 1 - epoch_num * 0.99 / (
-                        args.max_epoch - 1)  # from 1 to 0.01 as the epoch_num increases
+            # from 1 to 0.01 as the epoch_num increases
+            channelModel.temperature = 1 - epoch_num * 0.99 / (args.max_epoch - 1)
 
-        if (epoch_num % 1 == 0):
+        if epoch_num % 1 == 0:
             valid_loss, valid_all_loss, valid_acc, valid_all_acc, rouge_score = validate(data, sentenceEncoder,
                                                                                          channelModel, device, args)
             train_writer.add_scalar('validation/loss', valid_loss, epoch_num)
@@ -106,17 +112,22 @@ def trainChannelModel(args):
             train_writer.add_scalar('validation/acc', valid_acc, epoch_num)
             train_writer.add_scalar('validation/all_acc', valid_all_acc, epoch_num)
             train_writer.add_scalar('validation/rouge', rouge_score, epoch_num)
+
         eq = 0
         rouge_arr = []
         for batch_iter, train_batch in enumerate(data.gen_train_minibatch()):
-            sentenceEncoder.train();
+            sentenceEncoder.train()
             channelModel.train()
+
             progress = epoch_num + batch_iter / data.train_size
             iter_count += 1
+
             doc, sums, doc_len, sums_len = recursive_to_device(device, *train_batch)
             num_sent_of_sum = sums[0].size(0)
+
             if num_sent_of_sum == 1:  # if delete, summary should have more than one sentence
                 continue
+
             D = sentenceEncoder(doc, doc_len)
             S_good = sentenceEncoder(sums[0], sums_len[0])
             neg_sent_embed = sentenceEncoder(sums[1], sums_len[1])
@@ -138,14 +149,14 @@ def trainChannelModel(args):
 
             # ----------- fetch best_index from pyrouge_max_index --------
             ori_index = data.train_ori_index[batch_iter]
-            assert len(pyrouge_max_index[
-                           ori_index]) == l, "number of pyrouge_max_index[i] must be equal to the number of summary sentences"
+            assert len(pyrouge_max_index[ori_index]) == l, \
+                "number of pyrouge_max_index[i] must be equal to the number of summary sentences"
             best_index = pyrouge_max_index[ori_index][index]
             worse_indexes = random.sample(range(D.size(0)), min(D.size(0), 1))
 
             temp_good = []
             for i in range(l):
-                if (not i == index):
+                if i != index:
                     temp_good.append(S_good[i])
                 else:
                     temp_good.append(D[best_index])
@@ -155,7 +166,7 @@ def trainChannelModel(args):
             for worse_index in worse_indexes:
                 temp_bad = []
                 for i in range(l):
-                    if not i == index:
+                    if i != index:
                         temp_bad.append(S_good[i])
                     else:
                         temp_bad.append(D[worse_index])
@@ -164,6 +175,7 @@ def trainChannelModel(args):
             # prob calculation
             good_prob, addition = channelModel(D, S_good)
             good_prob_vector, good_attention_weight = addition['prob_vector'], addition['att_weight']
+
             bad_probs, bad_probs_vector = [], []
             bad_prob = 0.
 
@@ -182,6 +194,7 @@ def trainChannelModel(args):
             loss = loss_prob_term + args.alpha * regulation_term
 
             if loss_prob_term.item() > -args.margin:
+                # Chi optimize khi model kem
                 optimizer.zero_grad()
                 loss.backward()
                 nn.utils.clip_grad_norm_(parameters=params, max_norm=args.clip)
@@ -191,7 +204,7 @@ def trainChannelModel(args):
                 logging.info('Epoch %.2f, loss_prob: %.4f, bad_prob: %.4f, good_prob: %.4f, regulation_value: %.4f' % (
                 progress, loss_prob_term.item(), bad_prob.item(), good_prob.item(), regulation_term.item()))
 
-        if (epoch_num % 1 == 0):
+        if epoch_num % 1 == 0:
             try:
                 os.mkdir(os.path.join(args.save_dir, 'checkpoints/' + str(epoch_num)))
             except:
@@ -215,7 +228,7 @@ def validate(data_, sentenceEncoder_, channelModel_, device_, args):
     for batch_iter, valid_batch in enumerate(data_.gen_valid_minibatch()):
         if not (batch_iter % 100 == 0):
             continue
-        sentenceEncoder_.eval();
+        sentenceEncoder_.eval()
         channelModel_.eval()
         doc, sums, doc_len, sums_len = recursive_to_device(device_, *valid_batch)
         num_sent_of_sum = sums[0].size(0)
