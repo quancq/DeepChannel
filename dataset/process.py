@@ -15,7 +15,7 @@ from collections import Counter
 # from IPython import embed
 import xml.etree.ElementTree as et
 
-import my_utils
+from my_utils import load_glove_gensim
 from data import Dataset
 
 pattern_of_num = re.compile(r'[0-9]+')
@@ -160,7 +160,7 @@ def main():
 
     print('Loading glove......')
     # glove = pickle.load(open(args.glove, 'rb'))
-    glove = my_utils.load_glove_gensim(args.glove)
+    glove = load_glove_gensim(args.glove)
     word_dim = len(glove['the'])
     print('Word dim = %d' % word_dim)
 
