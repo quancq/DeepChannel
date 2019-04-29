@@ -4,8 +4,6 @@ from datetime import datetime
 import pandas as pd
 import json
 import numpy as np
-import cv2
-cv2.setNumThreads(0)
 import ast
 from gensim.scripts.glove2word2vec import glove2word2vec
 from gensim.models.keyedvectors import KeyedVectors
@@ -176,23 +174,6 @@ def load_json_lines(path):
     data = [ast.literal_eval(elm) for elm in data]
 
     return data
-
-
-def load_img(img_path):
-    try:
-        img = cv2.imread(img_path, cv2.IMREAD_COLOR)
-        return img
-    except:
-        print("Error when load image from ", img_path)
-        return None
-
-
-def save_img(img, img_path):
-    make_parent_dirs(img_path)
-    try:
-        cv2.imwrite(img_path, img)
-    except:
-        print("Error when save img to ", img_path)
 
 
 def copy_file(src_path, dst_path):
