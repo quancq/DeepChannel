@@ -23,12 +23,14 @@ nlp = None
 
 def process_document(d, sentence_len_limit):
     '''
+    d: string document
     functions:
         - lowercase
         - tokenize
         - replace numbers with 'zero'
         - remove sentences ending with ':' or '--'
         - remove sentences whose length <= sentence_len_limit
+    Return: list of sentences, each sentence is list of words
     '''
     global nlp
     if nlp is None:
@@ -37,14 +39,14 @@ def process_document(d, sentence_len_limit):
     tokenize_d = nlp(d)
     results = []
     for s in tokenize_d.sents:
-        if not s.text.strip():
+        if not s.text.strip():              # remove empty sentences
             continue
         sentence = []
         for w in s:
-            if not w.text.strip():
+            if not w.text.strip():          # remove empty word
                 continue
             if pattern_of_num.match(w.text):
-                sentence.append('zero')
+                sentence.append('zero')     # replace number with 'zero' symbol
             else:
                 sentence.append(w.text)
         if sentence[-1] == ':' or sentence[-1] == '--' or len(sentence) <= sentence_len_limit:
@@ -62,14 +64,21 @@ def hashhex(s):
 
 def read_cnn_dailymail(data_type, data_dir):
     def key2File(data_dir, key2file):
+        '''
+        :param data_dir: dir contain files with '.story' extension
+        (file story contain document - summary with delimiter @highlight
+        :param key2file: dictionary mapping file name to file path
+        :return:
+        '''
         for k in os.listdir(data_dir):
             f = os.path.join(data_dir, k)
             k = k[:-6]  # exclude suffix '.story'
             key2file[k] = f
 
-    data = [[], [], []]
-    length = [[], [], []]  # length of each sentence, whose index is corresponding to data
-    key2file = {}  # key: hashkey, excluding the suffix '.story'; file: absolute file path.
+    data = [[], [], []]         # data = [train, valid, test]
+    length = [[], [], []]       # length of each sentence, whose index is corresponding to data
+    key2file = {}               # key: hashkey, excluding the suffix '.story'; file: absolute file path.
+
     if data_type == 'cnn+dailymail':
         data_dir = data_dir.split(';')
         assert len(data_dir) == 2
@@ -82,14 +91,18 @@ def read_cnn_dailymail(data_type, data_dir):
     elif data_type == 'daily':
         key2File(data_dir, key2file)
         prefix = './cnndaily_url_splits/dailymail_'
+
     for i, split in enumerate(['train', 'val', 'test']):
         url_file = prefix + split + '.txt'
         for line in tqdm(open(url_file).readlines()):
+            # Read each line of file in cnndaily_url_splits folder
+            # Moi line mo ta 1 story
             k = hashhex(line.strip().encode())
             f = key2file[k]  # file path
+
             parts = open(f, encoding='latin1').read().split('@highlight')
-            docu = process_document(parts[0], 5)
-            summ = process_document('.'.join(parts[1:]) + '.', 3)
+            docu = process_document(parts[0], 5)                            # Remove document sentences whose len <= 5
+            summ = process_document('.'.join(parts[1:]) + '.', 3)           # Remove summary sentences whose len <= 3
             if len(docu) == 0 or len(summ) == 0:
                 continue
             docu_len = [len(s) for s in docu]
@@ -138,7 +151,7 @@ def main():
     parser.add_argument('--glove', default='/data/sjx/glove.6B.100d.py36.pkl', help='pickle file of glove')
     parser.add_argument('--data', default='cnn+dailymail', choices=datasets.keys())
     parser.add_argument('--data-dir', default='/data/share/cnn_stories/stories;/data/share/dailymail_stories/stories',
-                        help='If data=cnn+dailimail, then data-dir must contain two paths for cnn and dailymail seperated by ;.')
+                        help='If data=cnn+dailymail, then data-dir must contain two paths for cnn and dailymail seperated by ;.')
     parser.add_argument('--save-path', required=True)
     parser.add_argument('--max-word-num', type=int, default=50000)
     args = parser.parse_args()
@@ -150,7 +163,7 @@ def main():
 
     print('Reading data......')
     data, length = datasets[args.data](args.data, args.data_dir)
-    print('train/valid/test: %d/%d/%d' % tuple([len(_) for _ in data]))
+    print('train/valid/test: %d/%d/%d' % tuple([len(_) for _ in data]))         # Number (doc,sum) in data
 
     print('Count word frequency only from train set......')
     wtof = {}
@@ -158,11 +171,12 @@ def main():
         pass
     else:
         for j in range(len(data[0])):  # j-th sample of train set
-            for k in range(2):  # 0: content, 1: summary
+            for k in range(2):  # 0: document, 1: summary
                 for l in range(len(data[0][j][k])):  # l-th sentence
                     for word in data[0][j][k][l]:
                         wtof[word] = wtof.get(word, 0) + 1
-        wtof = Counter(wtof).most_common(args.max_word_num)
+
+        wtof = Counter(wtof).most_common(args.max_word_num)     # List of tuple (word, num_occurrence) with decrease frequency order
         needed_words = {w[0]: w[1] for w in wtof}
         # print('Preserve word num: %d. Examples: %s %s' % (len(needed_words), wtof[0][0], wtof[1][0]))
 
@@ -173,7 +187,7 @@ def main():
     glove['<unk>'] = np.zeros((word_dim,))
     missing_word_neighbors = {}
 
-    print('Replace word string with word index......')
+    print('Replace word string with word index and padding zero......')
     if (args.data == 'duc2007'):
         cnn_data = Dataset(path='/data/c-liang/data/cnndaily_5w_100d.pkl')
         needed_words = cnn_data.wtoi
@@ -194,12 +208,15 @@ def main():
                     # np.array for all documents/summaries
                     # shape of each document/summary: (# sentence, max length)
     else:
-        for i in range(len(data)):
-            for j in range(len(data[i])):
-                for k in range(2):  # 0: content, 1: summary
-                    max_len = max([len(s) for s in data[i][j][k]])  # max length of sentences for padding
-                    for l in range(len(data[i][j][k])):  # l-th sentence
-                        for m, word in enumerate(data[i][j][k][l]):  # m-th word
+        for i in range(len(data)):                                          # i == 0/1/2 => train/valid/test
+            for j in range(len(data[i])):                                   # j-th (doc,sum)
+                for k in range(2):                                          # 0: document, 1: summary
+                    max_len = max([len(s) for s in data[i][j][k]])          # max length of sentences for padding
+                    max_len_optim = max(length[i][j][k])
+                    assert(max_len == max_len_optim)
+
+                    for l in range(len(data[i][j][k])):                     # l-th sentence
+                        for m, word in enumerate(data[i][j][k][l]):         # m-th word
                             if word not in needed_words:
                                 word = '<unk>'
                             elif word not in wtoi:
@@ -207,7 +224,8 @@ def main():
                                 wtoi[word] = count
                                 count += 1
                             # print(word)
-                            data[i][j][k][l][m] = wtoi[word]
+                            data[i][j][k][l][m] = wtoi[word]                # convert text to index
+
                             # Find neighbor vectors for those words not in glove
                             if word not in glove:
                                 if word not in missing_word_neighbors:
@@ -215,15 +233,18 @@ def main():
                                 for neighbor in data[i][j][k][l][m - 5:m + 6]:  # window size: 10
                                     if neighbor in glove:
                                         missing_word_neighbors[word].append(glove[neighbor])
-                        if (max_len > len(data[i][j][k][l])):
+
+                        if max_len > len(data[i][j][k][l]):
                             data[i][j][k][l] += [0] * int(max_len - len(data[i][j][k][l]))  # padding l-th sentence
+
                     data[i][j][k] = np.asarray(data[i][j][k], dtype='int32')
                     length[i][j][k] = np.asarray(length[i][j][k], dtype='int32')
                     # np.array for all documents/summaries
                     # shape of each document/summary: (# sentence, max length)
+
     print('Calculate vectors for missing words by averaging neighbors......')
     # print(data)
-    if (args.data == 'duc2007'):
+    if args.data == 'duc2007':
         weight_matrix = cnn_data.weight
     else:
         for word in missing_word_neighbors:

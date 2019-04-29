@@ -24,6 +24,8 @@ class Dataset(object):
         self.wtoi = pickle.load(data_file)
         self.itow = pickle.load(data_file)
         data_file.close()
+
+        # Number (doc,sum) in data
         self.train_size, self.valid_size, self.test_size = len(self.train_set), len(self.valid_set), len(self.test_set)
 
         ## used for small training set
@@ -38,11 +40,13 @@ class Dataset(object):
         self.train_ptr = 0
 
     def gen_train_minibatch(self, shuffle=True):
+        # each generate batch contain document and golden summary, negative summary and info length
         # random shuffle both train_set and train_len
         if shuffle:
             combined = list(zip(self.train_set, self.train_len, self.train_ori_index))
             random.shuffle(combined)
             self.train_set[:], self.train_len[:], self.train_ori_index[:] = zip(*combined)
+
         for d, s, d_len, s_len in map(lambda _: _[0] + _[1], zip(self.train_set, self.train_len)):
             s_batch = [s]
             s_len_batch = [s_len]
