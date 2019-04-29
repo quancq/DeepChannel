@@ -16,7 +16,7 @@ from collections import Counter
 import xml.etree.ElementTree as et
 
 from my_utils import load_glove_gensim
-from data import Dataset
+from dataset.data import Dataset
 
 pattern_of_num = re.compile(r'[0-9]+')
 pattern_unicode = re.compile(r'\\u[\w]{4}')
