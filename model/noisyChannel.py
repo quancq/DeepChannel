@@ -34,14 +34,15 @@ class ChannelModel(nn.Module):
         To calculate P(D|S) given the sentence embeddings of D and S. 
         D: [n, Ds], where n is # sentences of document
         S: [m, Ds], where m is # sentences of summary
+        Ds là embedding_dim của sentence
         '''
         n, m = D.size(0), S.size(0)
         S_T = torch.transpose(S, 0, 1).contiguous()  # [Ds, m]
         att_weight = functional.softmax(
-            torch.mm(D, S_T) / self.temperature,
+            torch.mm(D, S_T) / self.temperature,    # size = (n,m)
             dim=1
         )  # [n, m]
-        att_S = torch.mm(att_weight, S)  # [n, Ds]
+        att_S = torch.mm(att_weight, S)  # [n, Ds], với mỗi câu d_i trong n câu, ta có vector tổ hợp từ m câu tóm tắt
 
         ## --------------------------------------------------------------- ##
         d_s_feat = torch.cat([D, att_S, torch.mul(D, att_S)], dim=1)
