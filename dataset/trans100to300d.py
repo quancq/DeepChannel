@@ -2,6 +2,7 @@ import pickle
 import numpy as np
 from tqdm import tqdm
 
+
 def main():
     glove300 = '/data/sjx/glove.840B.300d.py36.pkl'
     path100d = '/data/c-liang/data/cnndaily_5w_100d.pkl'
@@ -19,7 +20,7 @@ def main():
     new_weight = []
     for i in tqdm(range(weight.shape[0])):
         w = itow[i]
-        new_weight.append(glove.get(w, np.zeros((word_dim, ))))
+        new_weight.append(glove.get(w, np.zeros((word_dim,))))
     weight = np.vstack(new_weight)
     print(weight.shape)
 
@@ -29,6 +30,7 @@ def main():
         pickle.dump(weight, f)
         pickle.dump(data4, f)
         pickle.dump(itow, f)
+
 
 if __name__ == '__main__':
     main()

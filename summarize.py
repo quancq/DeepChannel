@@ -1,8 +1,9 @@
-#encoding=utf-8
+# encoding=utf-8
 import torch
 import time
 import argparse
 import logging
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)-8s %(message)s')
 logFormatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
 rootLogger = logging.getLogger()
@@ -21,6 +22,7 @@ import copy
 from tqdm import tqdm
 from IPython import embed
 
+
 def rouge_atten_matrix(doc, summ):
     doc_len = len(doc)
     summ_len = len(summ)
@@ -30,12 +32,13 @@ def rouge_atten_matrix(doc, summ):
             temp_mat[i, j] = Rouge().get_scores(doc[i], summ[j])[0]['rouge-1']['f']
     return temp_mat
 
+
 def evalLead3(args):
     data = Dataset(path=args.data_path)
     Rouge_list, Rouge155_list = [], []
     Rouge155_obj = Rouge155(stem=True, tmp='./tmp2')
     for batch_iter, valid_batch in tqdm(enumerate(data.gen_train_minibatch()), total=data.test_size):
-        if not(batch_iter % 100 == 0):
+        if not (batch_iter % 100 == 0):
             continue
         doc, sums, doc_len, sums_len = valid_batch
         selected_indexs = range(min(doc.size(0), 1))
@@ -55,7 +58,7 @@ def evalLead3(args):
 
         summ_matrix = torch.stack([doc[x] for x in selected_indexs]).data.numpy()
         summ_len_arr = torch.stack([doc_len[x] for x in selected_indexs]).data.numpy()
-        
+
         summ_arr = []
         for i in range(np.shape(summ_matrix)[0]):
             temp_sent = " ".join([data.itow[x] for x in summ_matrix[i]][:summ_len_arr[i]])
@@ -63,18 +66,18 @@ def evalLead3(args):
         score_Rouge = Rouge().get_scores(" ".join(summ_arr), " ".join(golden_summ_arr))
         Rouge_list.append(score_Rouge[0]['rouge-l']['f'])
         print(Rouge_list[-1])
-    print('='*60)
+    print('=' * 60)
     print(np.mean(Rouge_list))
 
 
 def genSentences(args):
-    np.set_printoptions(threshold=1e10) 
+    np.set_printoptions(threshold=1e10)
     print('Loading data......')
     data = Dataset(path=args.data_path)
     print('Building model......')
-    args.num_words = len(data.weight) # number of words
+    args.num_words = len(data.weight)  # number of words
     sentenceEncoder = SentenceEmbedding(**vars(args))
-    args.se_dim = sentenceEncoder.getDim() # sentence embedding dim
+    args.se_dim = sentenceEncoder.getDim()  # sentence embedding dim
     channelModel = ChannelModel(**vars(args))
     print('Initializing word embeddings......')
     sentenceEncoder.word_embedding.weight.data.set_(data.weight)
@@ -87,8 +90,8 @@ def genSentences(args):
     identityMatrix = torch.eye(100).to(device)
 
     print('Initializing optimizer and summary writer......')
-    params = [p for p in sentenceEncoder.parameters() if p.requires_grad] +\
-            [p for p in channelModel.parameters() if p.requires_grad]
+    params = [p for p in sentenceEncoder.parameters() if p.requires_grad] + \
+             [p for p in channelModel.parameters() if p.requires_grad]
 
     sentenceEncoder.load_state_dict(torch.load(os.path.join(args.save_dir, 'se.pkl')))
     channelModel.load_state_dict(torch.load(os.path.join(args.save_dir, 'channel.pkl')))
@@ -98,13 +101,14 @@ def genSentences(args):
     Rouge_list_2, Rouge_list_l = [], []
     Rouge155_list_2, Rouge155_list_l = [], []
     total_score = None
-    #Rouge155_obj = Rouge155(n_bytes=75, stem=True, tmp='.tmp')
+    # Rouge155_obj = Rouge155(n_bytes=75, stem=True, tmp='.tmp')
     Rouge155_obj = Rouge155(stem=True, tmp=".tmp")
     best_rouge1_arr = []
     redundancy_arr = []
-    for batch_iter, valid_batch in tqdm(enumerate(data.gen_test_minibatch()), total = data.test_size):
-        #print(valid_count)
-        sentenceEncoder.eval(); channelModel.eval()
+    for batch_iter, valid_batch in tqdm(enumerate(data.gen_test_minibatch()), total=data.test_size):
+        # print(valid_count)
+        sentenceEncoder.eval();
+        channelModel.eval()
         doc, sums, doc_len, sums_len = recursive_to_device(device, *valid_batch)
         num_sent_of_sum = sums[0].size(0)
         D = sentenceEncoder(doc, doc_len)
@@ -114,12 +118,12 @@ def genSentences(args):
         doc_len_arr = doc_len.cpu().data.numpy()
         golden_summ_matrix = sums[0].cpu().data.numpy()
         golden_summ_len_arr = sums_len[0].cpu().data.numpy()
-        
-        candidate_indexes = [i for i in range(len(doc_len_arr)) if doc_len_arr[i] >=0 and doc_len_arr[i] <= 10000]
-        
-        if(len(candidate_indexes) < 3):
+
+        candidate_indexes = [i for i in range(len(doc_len_arr)) if doc_len_arr[i] >= 0 and doc_len_arr[i] <= 10000]
+
+        if (len(candidate_indexes) < 3):
             continue
-        
+
         doc_ = ""
         doc_arr = []
         for i in range(np.shape(doc_matrix)[0]):
@@ -144,13 +148,13 @@ def genSentences(args):
                     temp_prob, addition = channelModel(D, torch.stack(temp))
                     probs[i] = temp_prob.item()
                 best_index = np.argmax(probs)
-                while(best_index in selected_indexs):
+                while (best_index in selected_indexs):
                     probs[best_index] = - 100000
                     best_index = np.argmax(probs)
                 selected_indexs.append(best_index)
-            _,addition = channelModel(D, S)
+            _, addition = channelModel(D, S)
             selected_indexs.sort()
-        if(args.method == 'iterative-delete'):
+        if (args.method == 'iterative-delete'):
             current_sent_set = range(l)
             best_index = -1
             doc_rouge_matrix = rouge_atten_matrix(doc_arr, doc_arr)
@@ -166,9 +170,9 @@ def genSentences(args):
                 selected_indexs.append(current_sent_set[best_index])
                 temp = []
                 for i in current_sent_set:
-                    if(doc_rouge_matrix[current_sent_set[best_index], i] < 0.9):
+                    if (doc_rouge_matrix[current_sent_set[best_index], i] < 0.9):
                         temp.append(i)
-                if(len(temp) == 0):
+                if (len(temp) == 0):
                     break
                 current_sent_set = temp
 
@@ -193,33 +197,36 @@ def genSentences(args):
 
         if args.method == 'random':
             selected_indexs = random.sample(range(l), min(3, l))
-        
+
         summ_matrix = torch.stack([doc[x] for x in selected_indexs]).cpu().data.numpy()
         summ_len_arr = torch.stack([doc_len[x] for x in selected_indexs]).cpu().data.numpy()
-        
+
         summ_ = ""
         summ_arr = []
         for i in range(np.shape(summ_matrix)[0]):
             temp_sent = " ".join([data.itow[x] for x in summ_matrix[i]][:summ_len_arr[i]])
             summ_ += str(i) + ": " + temp_sent + "\n\n"
             summ_arr.append(temp_sent)
-        f_ref = open("ref/"+str(batch_iter)+"_reference.txt","w")
-        f_sum = open("sum/"+str(batch_iter)+"_decoded.txt","w")
+        f_ref = open("ref/" + str(batch_iter) + "_reference.txt", "w")
+        f_sum = open("sum/" + str(batch_iter) + "_decoded.txt", "w")
         f_ref.write("\n".join(golden_summ_arr))
         f_sum.write("\n".join(summ_arr))
-    print('='*60)
+    print('=' * 60)
     total_score = Rouge155_obj.evaluate_folder("./sum", "./ref")
     print(total_score)
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--SE-type', default='GRU', choices=['GRU', 'BiGRU', 'AVG'])
-    parser.add_argument('--method', default = 'iterative', choices=['random', 'top-k-simple', 'top-k', 'iterative', 'iterative-delete', 'lead-3'])
+    parser.add_argument('--method', default='iterative',
+                        choices=['random', 'top-k-simple', 'top-k', 'iterative', 'iterative-delete', 'lead-3'])
     parser.add_argument('--word-dim', type=int, default=300, help='dimension of word embeddings')
     parser.add_argument('--hidden-dim', type=int, default=1024, help='dimension of hidden units per layer')
     parser.add_argument('--num-layers', type=int, default=1, help='number of layers in LSTM/BiLSTM')
     parser.add_argument('--cuda', action='store_true', default=True)
-    parser.add_argument('--data-path', required=True, help='pickle file obtained by dataset dump or datadir for torchtext')
+    parser.add_argument('--data-path', required=True,
+                        help='pickle file obtained by dataset dump or datadir for torchtext')
     parser.add_argument('--save-dir', type=str, help='path to save checkpoints and logs')
     args = parser.parse_args()
     return args
@@ -231,8 +238,9 @@ def prepare():
     fileHandler.setFormatter(logFormatter)
     rootLogger.addHandler(fileHandler)
     for k, v in vars(args).items():
-        print(k+':'+str(v))
+        print(k + ':' + str(v))
     return args
+
 
 def main():
     args = prepare()
@@ -241,7 +249,6 @@ def main():
     else:
         genSentences(args)
 
+
 if __name__ == "__main__":
     main()
-
-

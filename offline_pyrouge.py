@@ -14,11 +14,13 @@ from IPython import embed
 import json
 
 r1 = Rouge()
-topn = 5 #-1 means take all document sentences as candidates
+topn = 5  # -1 means take all document sentences as candidates
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data-path', required=True, help='pickle file obtained by dataset dump or datadir for torchtext')
+    parser.add_argument('--data-path', required=True,
+                        help='pickle file obtained by dataset dump or datadir for torchtext')
     parser.add_argument('--save-path', type=str, required=True, help='path to save results')
     args = parser.parse_args()
     return args
@@ -29,7 +31,7 @@ def job(doc_summ_pair):
     r2 = Rouge155(fast=True, tmp=tmp)
     doc, summ = doc_summ_pair
     max_pyrouge_index = []
-    for s in summ:        
+    for s in summ:
         if topn == -1 or topn > len(doc):
             candidate_index = list(range(len(doc)))
         else:
@@ -40,7 +42,7 @@ def job(doc_summ_pair):
         pyrouge_scores = []
         for j in candidate_index:
             d = doc[j]
-            pyrouge_scores.append(r2.score(d, {'A':s})['rouge_1_f_score'])
+            pyrouge_scores.append(r2.score(d, {'A': s})['rouge_1_f_score'])
         max_index = int(candidate_index[np.argmax(pyrouge_scores)])
         max_pyrouge_index.append(max_index)
         # len = len(summs[i])
@@ -48,9 +50,8 @@ def job(doc_summ_pair):
     return max_pyrouge_index
 
 
-
 if __name__ == '__main__':
-    mp.set_start_method('forkserver', force=True) # use fork server to take in charge of fork every time
+    mp.set_start_method('forkserver', force=True)  # use fork server to take in charge of fork every time
     args = parse_args()
     data = Dataset(path=args.data_path, fraction=1)
     doc_summ_pairs = []
@@ -71,9 +72,9 @@ if __name__ == '__main__':
     tic = time.time()
     with Pool(50) as p:
         results = p.map(job, doc_summ_pairs)
-    print('='*40)
+    print('=' * 40)
     print(time.time() - tic)
-    print('='*40)
+    print('=' * 40)
     print("Writing to %s" % args.save_path)
     with open(args.save_path, 'w') as f:
         json.dump(results, f, indent=2)

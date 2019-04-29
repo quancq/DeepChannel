@@ -2,6 +2,7 @@ import torch
 import time
 import argparse
 import logging
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)-8s %(message)s')
 logFormatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
 rootLogger = logging.getLogger()
@@ -18,7 +19,9 @@ import numpy as np
 from tensorboardX import SummaryWriter
 from utils import recursive_to_device, visualize_tensor, genPowerSet
 from rouge import Rouge
-#from IPython import embed
+
+
+# from IPython import embed
 
 
 def rouge_atten_matrix(doc, summ):
@@ -30,17 +33,18 @@ def rouge_atten_matrix(doc, summ):
             temp_mat[i, j] = Rouge().get_scores(doc[i], summ[j])[0]['rouge-1']['f']
     return temp_mat
 
+
 def trainChannelModel(args):
-    np.set_printoptions(threshold=1e10) 
+    np.set_printoptions(threshold=1e10)
     print('Loading data......')
     data = Dataset(path=args.data_path, fraction=args.fraction)
     print('Loading offline pyrouge max index.....')
     # the index of document sentence which has maximum pyrouge score with current summary sentence
-    pyrouge_max_index = json.load(open(args.offline_pyrouge_index_json)) 
+    pyrouge_max_index = json.load(open(args.offline_pyrouge_index_json))
     print('Building model......')
-    args.num_words = len(data.weight) # number of words
+    args.num_words = len(data.weight)  # number of words
     sentenceEncoder = SentenceEmbedding(**vars(args))
-    args.se_dim = sentenceEncoder.getDim() # sentence embedding dim
+    args.se_dim = sentenceEncoder.getDim()  # sentence embedding dim
     channelModel = ChannelModel(**vars(args))
     logging.info(sentenceEncoder)
     logging.info(channelModel)
@@ -58,15 +62,15 @@ def trainChannelModel(args):
     identityMatrix = torch.eye(100).to(device)
 
     print('Initializing optimizer and summary writer......')
-    params = [p for p in sentenceEncoder.parameters() if p.requires_grad] +\
-            [p for p in channelModel.parameters() if p.requires_grad]
+    params = [p for p in sentenceEncoder.parameters() if p.requires_grad] + \
+             [p for p in channelModel.parameters() if p.requires_grad]
     optimizer_class = {
-            'adam': optim.Adam,
-            'sgd': optim.SGD,
-            'adadelta': optim.Adadelta,
-            }[args.optimizer]
+        'adam': optim.Adam,
+        'sgd': optim.SGD,
+        'adadelta': optim.Adadelta,
+    }[args.optimizer]
     optimizer = optimizer_class(params=params, lr=args.lr, weight_decay=args.weight_decay)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer,milestones=[5,10,20,30],gamma = 0.5)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5, 10, 20, 30], gamma=0.5)
     train_writer = SummaryWriter(os.path.join(args.save_dir, 'log', 'train'))
     tic = time.time()
     iter_count = 0
@@ -76,11 +80,11 @@ def trainChannelModel(args):
     valid_acc = 0
     valid_all_acc = 0
     print('Start training......')
-    if(args.load_previous_model):
+    if (args.load_previous_model):
         sentenceEncoder.load_state_dict(torch.load(os.path.join(args.save_dir, 'se.pkl')))
         channelModel.load_state_dict(torch.load(os.path.join(args.save_dir, 'channel.pkl')))
 
-    if(args.validation):
+    if (args.validation):
         validate(data, sentenceEncoder, channelModel, device, args)
         return 0
     try:
@@ -91,10 +95,12 @@ def trainChannelModel(args):
     for epoch_num in range(args.max_epoch):
         scheduler.step()
         if args.anneal:
-            channelModel.temperature = 1 - epoch_num * 0.99 / (args.max_epoch-1) # from 1 to 0.01 as the epoch_num increases
+            channelModel.temperature = 1 - epoch_num * 0.99 / (
+                        args.max_epoch - 1)  # from 1 to 0.01 as the epoch_num increases
 
-        if(epoch_num % 1 == 0):
-            valid_loss, valid_all_loss, valid_acc, valid_all_acc, rouge_score = validate(data, sentenceEncoder, channelModel, device, args)
+        if (epoch_num % 1 == 0):
+            valid_loss, valid_all_loss, valid_acc, valid_all_acc, rouge_score = validate(data, sentenceEncoder,
+                                                                                         channelModel, device, args)
             train_writer.add_scalar('validation/loss', valid_loss, epoch_num)
             train_writer.add_scalar('validation/all_loss', valid_all_loss, epoch_num)
             train_writer.add_scalar('validation/acc', valid_acc, epoch_num)
@@ -103,18 +109,19 @@ def trainChannelModel(args):
         eq = 0
         rouge_arr = []
         for batch_iter, train_batch in enumerate(data.gen_train_minibatch()):
-            sentenceEncoder.train(); channelModel.train()
+            sentenceEncoder.train();
+            channelModel.train()
             progress = epoch_num + batch_iter / data.train_size
             iter_count += 1
             doc, sums, doc_len, sums_len = recursive_to_device(device, *train_batch)
             num_sent_of_sum = sums[0].size(0)
-            if num_sent_of_sum == 1: # if delete, summary should have more than one sentence
+            if num_sent_of_sum == 1:  # if delete, summary should have more than one sentence
                 continue
             D = sentenceEncoder(doc, doc_len)
             S_good = sentenceEncoder(sums[0], sums_len[0])
             neg_sent_embed = sentenceEncoder(sums[1], sums_len[1])
 
-            l = S_good.size(0)   
+            l = S_good.size(0)
 
             S_bads = []
             doc_matrix = doc.cpu().data.numpy()
@@ -126,18 +133,19 @@ def trainChannelModel(args):
             for i in range(np.shape(doc_matrix)[0]):
                 doc_.append(" ".join([data.itow[x] for x in doc_matrix[i]][:doc_len_arr[i]]))
 
-            index = random.randint(0, l - 1) 
+            index = random.randint(0, l - 1)
             summ_.append(" ".join([data.itow[x] for x in summ_matrix[index]][:summ_len_arr[index]]))
-            
+
             # ----------- fetch best_index from pyrouge_max_index --------
             ori_index = data.train_ori_index[batch_iter]
-            assert len(pyrouge_max_index[ori_index]) == l, "number of pyrouge_max_index[i] must be equal to the number of summary sentences"
+            assert len(pyrouge_max_index[
+                           ori_index]) == l, "number of pyrouge_max_index[i] must be equal to the number of summary sentences"
             best_index = pyrouge_max_index[ori_index][index]
             worse_indexes = random.sample(range(D.size(0)), min(D.size(0), 1))
 
             temp_good = []
             for i in range(l):
-                if(not i == index):
+                if (not i == index):
                     temp_good.append(S_good[i])
                 else:
                     temp_good.append(D[best_index])
@@ -169,7 +177,8 @@ def trainChannelModel(args):
             ########### loss ############
             loss_prob_term = bad_prob - good_prob
             n, m = good_attention_weight.size()
-            regulation_term = torch.norm(torch.mm(good_attention_weight.t(), good_attention_weight) - n/m * torch.eye(m).to(device), 2)
+            regulation_term = torch.norm(
+                torch.mm(good_attention_weight.t(), good_attention_weight) - n / m * torch.eye(m).to(device), 2)
             loss = loss_prob_term + args.alpha * regulation_term
 
             if loss_prob_term.item() > -args.margin:
@@ -179,15 +188,18 @@ def trainChannelModel(args):
                 optimizer.step()
 
             if iter_count % 100 == 0:
-                logging.info('Epoch %.2f, loss_prob: %.4f, bad_prob: %.4f, good_prob: %.4f, regulation_value: %.4f' % (progress, loss_prob_term.item(), bad_prob.item(), good_prob.item(), regulation_term.item()))
+                logging.info('Epoch %.2f, loss_prob: %.4f, bad_prob: %.4f, good_prob: %.4f, regulation_value: %.4f' % (
+                progress, loss_prob_term.item(), bad_prob.item(), good_prob.item(), regulation_term.item()))
 
-        if(epoch_num % 1 == 0):
+        if (epoch_num % 1 == 0):
             try:
-                os.mkdir(os.path.join(args.save_dir, 'checkpoints/'+str(epoch_num)))
+                os.mkdir(os.path.join(args.save_dir, 'checkpoints/' + str(epoch_num)))
             except:
                 pass
-            torch.save(sentenceEncoder.state_dict(), os.path.join(args.save_dir, 'checkpoints/'+ str(epoch_num) + '/se.pkl'))
-            torch.save(channelModel.state_dict(), os.path.join(args.save_dir, 'checkpoints/'+ str(epoch_num) + '/channel.pkl'))
+            torch.save(sentenceEncoder.state_dict(),
+                       os.path.join(args.save_dir, 'checkpoints/' + str(epoch_num) + '/se.pkl'))
+            torch.save(channelModel.state_dict(),
+                       os.path.join(args.save_dir, 'checkpoints/' + str(epoch_num) + '/channel.pkl'))
     [rootLogger.removeHandler(h) for h in rootLogger.handlers if isinstance(h, logging.FileHandler)]
 
 
@@ -201,14 +213,15 @@ def validate(data_, sentenceEncoder_, channelModel_, device_, args):
     Rouge_list = []
 
     for batch_iter, valid_batch in enumerate(data_.gen_valid_minibatch()):
-        if not(batch_iter % 100 == 0):
+        if not (batch_iter % 100 == 0):
             continue
-        sentenceEncoder_.eval(); channelModel_.eval()
+        sentenceEncoder_.eval();
+        channelModel_.eval()
         doc, sums, doc_len, sums_len = recursive_to_device(device_, *valid_batch)
         num_sent_of_sum = sums[0].size(0)
         D = sentenceEncoder_(doc, doc_len)
         l = D.size(0)
-        if(l < 2):
+        if (l < 2):
             continue
         doc_matrix = doc.cpu().data.numpy()
         doc_len_arr = doc_len.cpu().data.numpy()
@@ -241,20 +254,20 @@ def validate(data_, sentenceEncoder_, channelModel_, device_, args):
                 probs.append(temp_prob.item())
             probs_arr.append(probs)
             best_index = np.argmax(probs)
-            while(best_index in selected_indexs):
+            while (best_index in selected_indexs):
                 probs[best_index] = -100000
                 best_index = np.argmax(probs)
             selected_indexs.append(best_index)
         summ_matrix = torch.stack([doc[x] for x in selected_indexs]).cpu().data.numpy()
         summ_len_arr = torch.stack([doc_len[x] for x in selected_indexs]).cpu().data.numpy()
-        
+
         summ_ = ""
         summ_arr = []
         for i in range(np.shape(summ_matrix)[0]):
             temp_sent = " ".join([data_.itow[x] for x in summ_matrix[i]][:summ_len_arr[i]])
             summ_ += str(i) + ": " + temp_sent + "\n\n"
             summ_arr.append(temp_sent)
-        
+
         best_rouge_summ_arr = []
         for s in golden_summ_arr:
             temp = []
@@ -264,26 +277,27 @@ def validate(data_, sentenceEncoder_, channelModel_, device_, args):
             best_rouge_summ_arr.append(doc_arr[index])
         score_Rouge = Rouge().get_scores(" ".join(summ_arr), " ".join(golden_summ_arr))
         Rouge_list.append(score_Rouge[0]['rouge-1']['f'])
-    
+
     rouge_score = np.mean(Rouge_list)
     print("ROUGE 1/100 sample : ", rouge_score)
 
     for batch_iter, valid_batch in enumerate(data_.gen_valid_minibatch()):
-        if not(batch_iter % 100 == 0):
+        if not (batch_iter % 100 == 0):
             continue
-        sentenceEncoder_.eval(); channelModel_.eval()
+        sentenceEncoder_.eval();
+        channelModel_.eval()
         valid_iter_count += 1
         doc, sums, doc_len, sums_len = recursive_to_device(device_, *valid_batch)
         num_sent_of_sum = sums[0].size(0)
-        if num_sent_of_sum == 1: # if delete, summary should have more than one sentence
+        if num_sent_of_sum == 1:  # if delete, summary should have more than one sentence
             continue
         D = sentenceEncoder_(doc, doc_len)
         S_good = sentenceEncoder_(sums[0], sums_len[0])
         neg_sent_embed = sentenceEncoder_(sums[1], sums_len[1])
 
-        l = S_good.size(0)        
+        l = S_good.size(0)
         S_bads = []
-        
+
         doc_matrix = doc.cpu().data.numpy()
         doc_len_arr = doc_len.cpu().data.numpy()
         summ_matrix = sums[0].cpu().data.numpy()
@@ -293,16 +307,16 @@ def validate(data_, sentenceEncoder_, channelModel_, device_, args):
         for i in range(np.shape(doc_matrix)[0]):
             doc_.append(" ".join([data_.itow[x] for x in doc_matrix[i]][:doc_len_arr[i]]))
 
-        index = random.randint(0, l - 1) 
+        index = random.randint(0, l - 1)
         summ_.append(" ".join([data_.itow[x] for x in summ_matrix[index]][:summ_len_arr[index]]))
-         
+
         atten_mat = rouge_atten_matrix(summ_, doc_)
         best_index = np.argmax(atten_mat[0])
-        worst_index= np.argmin(atten_mat[0])
+        worst_index = np.argmin(atten_mat[0])
         temp_good = []
         temp_bad = []
         for i in range(l):
-            if(not i == index):
+            if (not i == index):
                 temp_good.append(S_good[i])
                 temp_bad.append(S_good[i])
             else:
@@ -326,7 +340,7 @@ def validate(data_, sentenceEncoder_, channelModel_, device_, args):
         loss_arr.append(loss)
         for bad in bad_probs:
             all_loss_arr.append((bad - good_prob).item())
-        if(args.visualize and valid_iter_count % 100 == 0):
+        if (args.visualize and valid_iter_count % 100 == 0):
             doc_matrix = doc.cpu().data.numpy()
             doc_len_arr = doc_len.cpu().data.numpy()
             summ_matrix = sums[0].cpu().data.numpy()
@@ -338,17 +352,17 @@ def validate(data_, sentenceEncoder_, channelModel_, device_, args):
             summ_ = ""
             for i in range(np.shape(summ_matrix)[0]):
                 summ_ += str(i) + ": " + " ".join([data_.itow[x] for x in summ_matrix[i]][:summ_len_arr[i]]) + "\n\n"
-            logging.info("\nsample case %d:\n\ndocument:\n\n%s\n\nsummary:\n\n%s\n\nattention matrix:\n\n%s\n\n"%(valid_iter_count, str(doc_), str(summ_), str(good_attention_weight.cpu().data.numpy())))
-            
+            logging.info("\nsample case %d:\n\ndocument:\n\n%s\n\nsummary:\n\n%s\n\nattention matrix:\n\n%s\n\n" % (
+            valid_iter_count, str(doc_), str(summ_), str(good_attention_weight.cpu().data.numpy())))
+
     valid_loss = float(np.mean(loss_arr))
     valid_all_loss = float(np.mean(all_loss_arr))
     valid_acc = (np.sum(np.int32(np.array(loss_arr) < 0)) + 0.) / len(loss_arr)
     valid_all_acc = (np.sum(np.int32(np.array(all_loss_arr) < 0)) + 0.) / len(all_loss_arr)
-    logging.info("avg loss: %4f, avg all_loss: %4f, acc: %4f, all_acc: %4f" % (valid_loss, valid_all_loss, valid_acc, valid_all_acc))
-
+    logging.info("avg loss: %4f, avg all_loss: %4f, acc: %4f, all_acc: %4f" % (
+    valid_loss, valid_all_loss, valid_acc, valid_all_acc))
 
     return valid_loss, valid_all_loss, valid_acc, valid_all_acc, rouge_score
-
 
 
 def parse_args():
@@ -359,7 +373,7 @@ def parse_args():
     parser.add_argument('--num-layers', type=int, default=1, help='number of layers in LSTM/BiLSTM')
     parser.add_argument('--dropout', type=float, default=0.3)
     parser.add_argument('--margin', type=float, default=1e10, help='margin of hinge loss, must >= 0')
-    
+
     parser.add_argument('--clip', type=float, default=5, help='clip to prevent the too large grad')
     parser.add_argument('--lr', type=float, default=1e-5, help='initial learning rate')
     parser.add_argument('--weight-decay', type=float, default=1e-5, help='weight decay rate per batch')
@@ -374,7 +388,8 @@ def parse_args():
     parser.add_argument('--alpha', type=float, default=0.001, help='weight of regularization term')
     parser.add_argument('--fraction', type=float, default=1, help='fraction of training set reduction')
 
-    parser.add_argument('--data-path', required=True, help='pickle file obtained by dataset dump or datadir for torchtext')
+    parser.add_argument('--data-path', required=True,
+                        help='pickle file obtained by dataset dump or datadir for torchtext')
     parser.add_argument('--offline-pyrouge-index-json', help='json file of offline max pyrouge index')
     parser.add_argument('--save-dir', type=str, required=True, help='path to save checkpoints and logs')
     parser.add_argument('--load-previous-model', action='store_true')
@@ -405,8 +420,9 @@ def prepare():
     rootLogger.addHandler(fileHandler)
     # args display
     for k, v in vars(args).items():
-        logging.info(k+':'+str(v))
+        logging.info(k + ':' + str(v))
     return args
+
 
 def main():
     args = prepare()
@@ -415,4 +431,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

@@ -1,8 +1,10 @@
 import torch
 
+
 def recursive_to_device(device, *tensors):
     return [recursive_to_device(device, *t) if isinstance(t, list) or isinstance(t, tuple) \
-            else t.to(device) for t in tensors]
+                else t.to(device) for t in tensors]
+
 
 def visualize_tensor(tensor):
     tensor = tensor.squeeze()
@@ -14,6 +16,7 @@ def visualize_tensor(tensor):
         return '\n'.join([visualize_tensor(tensor[i]) for i in range(tensor.size(0))])
     else:
         raise Exception('dim must <=2')
+
 
 def reverse_padded_sequence(inputs, lengths, batch_first=False):
     """Reverses sequences according to their lengths.
@@ -38,7 +41,7 @@ def reverse_padded_sequence(inputs, lengths, batch_first=False):
                         for _ in range(inputs.size(0))]
     for i, length in enumerate(lengths):
         if length > 0:
-            reversed_indices[i][:length] = reversed_indices[i][length-1::-1]
+            reversed_indices[i][:length] = reversed_indices[i][length - 1::-1]
     reversed_indices = (torch.LongTensor(reversed_indices).unsqueeze(2)
                         .expand_as(inputs))
     reversed_indices = reversed_indices.to(inputs.device)
@@ -47,11 +50,13 @@ def reverse_padded_sequence(inputs, lengths, batch_first=False):
         reversed_inputs = reversed_inputs.transpose(0, 1)
     return reversed_inputs
 
+
 def genPowerSet(items):
     result = [[]]
     for x in items:
         result.extend([subset + [x] for subset in result])
     return result
+
 
 def genSubset(items, element_num):
     result_ = [[]]
@@ -65,4 +70,3 @@ def genSubset(items, element_num):
         if len(x) == element_num:
             result.append(x)
     return result
-
