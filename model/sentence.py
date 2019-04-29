@@ -38,10 +38,11 @@ class BiGRU(nn.Module):
 
     def encode(self, input, length):
         # input: [bsz, len, w_dim]
-        # length: [bsz, ]
+        # length: [bsz, ], mỗi phần tử chỉ ra chiều dài thực sự (length[i] <= input.size[1]) của batch tương ứng
         input = torch.transpose(input, 0, 1).contiguous()  # [len, bsz, w_dim]
         reversed_input = reverse_padded_sequence(input, length, batch_first=False)
 
+        # Encoder GRU trả về 2 đối tương là (output, hidden_state)
         forward_output = self.forward_encoder(input)[0]
         reversed_backward_output = self.backward_encoder(reversed_input)[0]  # [len, bsz, hid_dim]
         return forward_output, reversed_backward_output
@@ -61,14 +62,27 @@ class BiGRU_wrapper(BiGRU):
         super().__init__(**kwargs)
 
     def forward(self, input, length):
+        # input.size = (batch_size, seq_len, input_dim)
+        # forward_output.size = (seq_len, batch_size, hidden_dim)
         forward_output, reversed_backward_output = super().encode(input, length)
         bsz = forward_output.size(1)
+
+        # output = []
+        # for i in range(bsz):
+        #     output.append(torch.cat([
+        #         forward_output[length[i] - 1, i],  # forward
+        #         reversed_backward_output[length[i] - 1, i]  # backward
+        #     ]))
+        # output = torch.stack(output)
+
+        # Chỉ giữ output tương ứng với time_step cuối cùng
         output = torch.stack([
             torch.cat([
                 forward_output[length[i] - 1, i],  # forward
                 reversed_backward_output[length[i] - 1, i]  # backward
             ])  # concat the forward embedding and the backward embedding
             for i in range(bsz)])
+
         return output  # [bsz, 2*h_dim]
 
 
@@ -103,6 +117,9 @@ class GRU_wrapper(nn.Module):
 
 
 class AVG_wrapper(nn.Module):
+    '''
+    Tính trung bình các vector trong cùng 1 batch => Output các vector đại diện cho các batch
+    '''
 
     def __init__(self, **kwargs):
         super().__init__()
@@ -114,7 +131,7 @@ class AVG_wrapper(nn.Module):
         output = torch.stack(
             [torch.mean(input[i, :length[i]], dim=0) for i in range(bsz)]
         )
-        return output  # [bsz, h_dim]
+        return output  # [bsz, w_dim]
 
 
 class SentenceEmbedding(nn.Module):
