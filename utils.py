@@ -31,6 +31,7 @@ def reverse_padded_sequence(inputs, lengths, batch_first=False):
 
     if not batch_first:
         inputs = inputs.transpose(0, 1)
+    # input.size = (B,T,*)
     if inputs.size(0) != len(lengths):
         raise ValueError('inputs incompatible with lengths.')
     reversed_indices = [list(range(inputs.size(1)))
