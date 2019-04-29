@@ -7,6 +7,8 @@ import numpy as np
 import cv2
 cv2.setNumThreads(0)
 import ast
+from gensim.scripts.glove2word2vec import glove2word2vec
+from gensim.models.keyedvectors import KeyedVectors
 
 DEFAULT_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
@@ -227,6 +229,16 @@ def move_file(src_path, dst_path):
     except Exception:
         print("Error: when move file from {} to {}".format(src_path, dst_path))
         return False
+
+
+def convert_glove_to_word2vec(glove_path, save_path):
+    glove2word2vec(glove_input_file=glove_path, word2vec_output_file=save_path)
+    print("Convert glove -> word2vec done. Save word2vec to ", save_path)
+
+
+def load_glove_gensim(path):
+    glove = KeyedVectors.load_word2vec_format(path, binary=False)
+    return glove
 
 
 # def save_log(log_save_folder, log):
