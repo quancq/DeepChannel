@@ -169,7 +169,7 @@ def main():
     # glove = pickle.load(open(args.glove, 'rb'))
     glove = load_glove_gensim(args.glove)
 
-    print("Number token in glove : ", len(glove))
+    print("Number token in glove : ", glove.syn0.shape[0])
     word_dim = len(glove['the'])
     print('Word dim = %d' % word_dim)
 
