@@ -193,7 +193,7 @@ def main():
         pickle.dump(data, tokenized_data_file)
         pickle.dump(length, tokenized_data_file)
         tokenized_data_file.close()
-        print("Save tokenized data to {} done".format(args.tokenized_path))
+        print("Save tokenized data to {} done".format(args.save_tokenized_path))
 
     print('train/valid/test: %d/%d/%d' % tuple([len(_) for _ in data]))         # Number (doc,sum) in data
 
