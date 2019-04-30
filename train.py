@@ -19,6 +19,7 @@ import numpy as np
 from tensorboardX import SummaryWriter
 from utils import recursive_to_device, visualize_tensor, genPowerSet
 from rouge import Rouge
+import my_utils
 
 
 # from IPython import embed
@@ -69,11 +70,21 @@ def trainChannelModel(args):
     print('Initializing optimizer and summary writer......')
     params = [p for p in sentenceEncoder.parameters() if p.requires_grad] + \
              [p for p in channelModel.parameters() if p.requires_grad]
+
+    opt_name = args.optimizer
+    scheduler_name = "MLR"
+
+    if args.resume_ckpt:
+        checkpoints = torch.load(args.resume_ckpt)
+        opt_name = checkpoints["opt_name"]
+        scheduler_name = checkpoints["scheduler_name"]
+
     optimizer_class = {
         'adam': optim.Adam,
         'sgd': optim.SGD,
         'adadelta': optim.Adadelta,
-    }[args.optimizer]
+    }[opt_name]
+
     optimizer = optimizer_class(params=params, lr=args.lr, weight_decay=args.weight_decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5, 10, 20, 30], gamma=0.5)
 
@@ -85,10 +96,19 @@ def trainChannelModel(args):
     valid_all_loss = 0
     valid_acc = 0
     valid_all_acc = 0
+
+    start_epoch = 1
     print('Start training......')
-    if (args.load_previous_model):
-        sentenceEncoder.load_state_dict(torch.load(os.path.join(args.save_dir, 'se.pkl')))
-        channelModel.load_state_dict(torch.load(os.path.join(args.save_dir, 'channel.pkl')))
+    if args.resume_ckpt:
+        # checkpoints = torch.load(args.resume_ckpt)
+        sentenceEncoder.load_state_dict(checkpoints["se_state_dict"])
+        channelModel.load_state_dict(checkpoints["channel_state_dict"])
+        start_epoch = checkpoints["epoch"] + 1
+
+        print("Load resume checkpoints from {} done".format(args.resume_ckpt))
+
+        # sentenceEncoder.load_state_dict(torch.load(os.path.join(args.save_dir, 'se.pkl')))
+        # channelModel.load_state_dict(torch.load(os.path.join(args.save_dir, 'channel.pkl')))
 
     if args.validation:
         validate(data, sentenceEncoder, channelModel, device, args)
@@ -98,7 +118,8 @@ def trainChannelModel(args):
     except:
         pass
 
-    for epoch_num in range(args.max_epoch):
+    end_epoch = args.max_epoch
+    for epoch_num in range(start_epoch, end_epoch):
         scheduler.step()
         if args.anneal:
             # from 1 to 0.01 as the epoch_num increases
@@ -202,17 +223,27 @@ def trainChannelModel(args):
 
             if iter_count % 100 == 0:
                 logging.info('Epoch %.2f, loss_prob: %.4f, bad_prob: %.4f, good_prob: %.4f, regulation_value: %.4f' % (
-                progress, loss_prob_term.item(), bad_prob.item(), good_prob.item(), regulation_term.item()))
+                    progress, loss_prob_term.item(), bad_prob.item(), good_prob.item(), regulation_term.item()))
 
         if epoch_num % 1 == 0:
-            try:
-                os.mkdir(os.path.join(args.save_dir, 'checkpoints/' + str(epoch_num)))
-            except:
-                pass
-            torch.save(sentenceEncoder.state_dict(),
-                       os.path.join(args.save_dir, 'checkpoints/' + str(epoch_num) + '/se.pkl'))
-            torch.save(channelModel.state_dict(),
-                       os.path.join(args.save_dir, 'checkpoints/' + str(epoch_num) + '/channel.pkl'))
+            # try:
+            #     os.mkdir(os.path.join(args.save_dir, 'checkpoints/' + str(epoch_num)))
+            # except:
+            #     pass
+
+            # Save checkpoints
+            states = dict(epoch=epoch_num, se_state_dict=sentenceEncoder.state_dict(),
+                          channel_state_dict=channelModel.state_dict(),
+                          optimizer=optimizer.state_dict(), scheduler=scheduler.state_dict(),
+                          opt_name=opt_name, scheduler_name=scheduler_name, model_name=net.name)
+            save_ckpt_path = os.path.join(args.save_dir, "checkpoints", '{}_ckpt_{}.pth'.format(net.name, epoch_num))
+            torch.save(states, save_ckpt_path)
+
+            # torch.save(sentenceEncoder.state_dict(),
+            #            os.path.join(args.save_dir, 'checkpoints/' + str(epoch_num) + '/se.pkl'))
+            # torch.save(channelModel.state_dict(),
+            #            os.path.join(args.save_dir, 'checkpoints/' + str(epoch_num) + '/channel.pkl'))
+
     [rootLogger.removeHandler(h) for h in rootLogger.handlers if isinstance(h, logging.FileHandler)]
 
 
@@ -366,14 +397,14 @@ def validate(data_, sentenceEncoder_, channelModel_, device_, args):
             for i in range(np.shape(summ_matrix)[0]):
                 summ_ += str(i) + ": " + " ".join([data_.itow[x] for x in summ_matrix[i]][:summ_len_arr[i]]) + "\n\n"
             logging.info("\nsample case %d:\n\ndocument:\n\n%s\n\nsummary:\n\n%s\n\nattention matrix:\n\n%s\n\n" % (
-            valid_iter_count, str(doc_), str(summ_), str(good_attention_weight.cpu().data.numpy())))
+                valid_iter_count, str(doc_), str(summ_), str(good_attention_weight.cpu().data.numpy())))
 
     valid_loss = float(np.mean(loss_arr))
     valid_all_loss = float(np.mean(all_loss_arr))
     valid_acc = (np.sum(np.int32(np.array(loss_arr) < 0)) + 0.) / len(loss_arr)
     valid_all_acc = (np.sum(np.int32(np.array(all_loss_arr) < 0)) + 0.) / len(all_loss_arr)
     logging.info("avg loss: %4f, avg all_loss: %4f, acc: %4f, all_acc: %4f" % (
-    valid_loss, valid_all_loss, valid_acc, valid_all_acc))
+        valid_loss, valid_all_loss, valid_acc, valid_all_acc))
 
     return valid_loss, valid_all_loss, valid_acc, valid_all_acc, rouge_score
 
@@ -391,7 +422,7 @@ def parse_args():
     parser.add_argument('--lr', type=float, default=1e-5, help='initial learning rate')
     parser.add_argument('--weight-decay', type=float, default=1e-5, help='weight decay rate per batch')
     parser.add_argument('--max-epoch', type=int, default=10)
-    parser.add_argument('--cuda', action='store_true', default=True)
+    parser.add_argument('--cpu', action='store_true', default=False)
     parser.add_argument('--optimizer', default='adam', choices=['adam', 'sgd', 'adadelta'])
     parser.add_argument('--batch-size', type=int, default=1, help='batch size for training, not used now')
     parser.add_argument('--tune-word-embedding', action='store_true', help='specified to fine tune glove vectors')
@@ -404,8 +435,8 @@ def parse_args():
     parser.add_argument('--data-path', required=True,
                         help='pickle file obtained by dataset dump or datadir for torchtext')
     parser.add_argument('--offline-pyrouge-index-json', help='json file of offline max pyrouge index')
-    parser.add_argument('--save-dir', type=str, required=True, help='path to save checkpoints and logs')
-    parser.add_argument('--load-previous-model', action='store_true')
+    parser.add_argument('--save-dir', type=str, default="./experiments", help='path to save checkpoints and logs')
+    parser.add_argument('--resume_ckpt', help='path contain pretrained model')
     parser.add_argument('--validation', action='store_true')
     args = parser.parse_args()
     return args
@@ -414,10 +445,14 @@ def parse_args():
 def prepare():
     # dir preparation
     args = parse_args()
-    if not args.load_previous_model:
-        if os.path.isdir(args.save_dir):
-            shutil.rmtree(args.save_dir)
-        os.mkdir(args.save_dir)
+    args.save_dir = os.path.join(args.save_dir, my_utils.get_time_str())
+    my_utils.make_dirs(args.save_dir)
+    args.cuda = not args.cpu
+
+    # if not args.load_previous_model:
+    #     if os.path.isdir(args.save_dir):
+    #         shutil.rmtree(args.save_dir)
+    #     os.mkdir(args.save_dir)
     # seed setting
     torch.manual_seed(args.seed)
     random.seed(args.seed)
