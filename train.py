@@ -438,7 +438,7 @@ def parse_args():
     parser.add_argument('--offline-pyrouge-index-json', help='json file of offline max pyrouge index')
     parser.add_argument('--save-dir', type=str, default="./experiments", help='path to save checkpoints and logs')
     parser.add_argument('--resume_ckpt', help='path contain pretrained model')
-    parser.add_argument('--model_name', help='deep_channel')
+    parser.add_argument('--model_name', default='deep_channel')
     parser.add_argument('--validation', action='store_true')
     args = parser.parse_args()
     return args
