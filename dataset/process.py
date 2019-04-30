@@ -16,6 +16,7 @@ from collections import Counter
 # from IPython import embed
 import xml.etree.ElementTree as et
 
+import my_utils
 from my_utils import load_glove_gensim
 from dataset.data import Dataset
 
@@ -173,6 +174,8 @@ def main():
     parser.add_argument('--max_docs', type=int, default=-1)
     args = parser.parse_args()
 
+    my_utils.make_parent_dirs(args.save_path)
+
     print('Reading data......')
     if args.tokenized_path:
         tokenized_data_file = open(args.tokenized_path, 'rb')
@@ -182,6 +185,7 @@ def main():
         print("Load tokenized data from {} done".format(args.tokenized_path))
     else:
         assert(args.save_tokenized_path is not None)
+        my_utils.make_parent_dirs(args.save_tokenized_path)
         data, length = datasets[args.data](args.data, args.data_dir, args.max_docs)
 
         # Save tokenized data
