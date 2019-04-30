@@ -37,8 +37,9 @@ def process_document(d, sentence_len_limit):
     '''
     global nlp
     if nlp is None:
-        nlp = spacy.load('en', disable=["tagger", "parser", "ner"])
-        nlp.add_pipe(nlp.create_pipe('sentencizer'))
+        # nlp = spacy.load('en', disable=["tagger", "parser", "ner"])
+        nlp = spacy.load('en', disable=["parser"])
+        # nlp.add_pipe(nlp.create_pipe('sentencizer'))
         print("\n\nSpacy model pipeline contain {} components: {}\n\n".format(len(nlp.pipe_names), nlp.pipeline))
 
     d = d.lower()
@@ -167,6 +168,8 @@ def main():
     print('Loading glove......')
     # glove = pickle.load(open(args.glove, 'rb'))
     glove = load_glove_gensim(args.glove)
+
+    print("Number token in glove : ", len(glove))
     word_dim = len(glove['the'])
     print('Word dim = %d' % word_dim)
 
