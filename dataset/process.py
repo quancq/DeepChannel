@@ -69,7 +69,7 @@ def hashhex(s):
     return h.hexdigest()
 
 
-def read_cnn_dailymail(data_type, data_dir):
+def read_cnn_dailymail(data_type, data_dir, max_docs=-1):
     def key2File(data_dir, key2file):
         '''
         :param data_dir: dir contain files with '.story' extension
@@ -101,7 +101,12 @@ def read_cnn_dailymail(data_type, data_dir):
 
     for i, split in enumerate(['train', 'val', 'test']):
         url_file = prefix + split + '.txt'
-        for line in tqdm(open(url_file).readlines()):
+        lines = open(url_file).readlines()
+
+        if max_docs is not None and max_docs > 0:
+            lines = list(lines)[:max_docs]
+
+        for line in tqdm(lines):
             # Read each line of file in cnndaily_url_splits folder
             # Moi line mo ta 1 story
             k = hashhex(line.strip().encode())
@@ -159,27 +164,38 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--glove', default='./word_embedding/glove/glove_gensim_300d.txt', help='glove gensim format path')
     parser.add_argument('--data', default='cnn+dailymail', choices=datasets.keys())
-    parser.add_argument('--data-dir', default='/data/share/cnn_stories/stories;/data/share/dailymail_stories/stories',
+    parser.add_argument('--data_dir', default='/data/share/cnn_stories/stories;/data/share/dailymail_stories/stories',
                         help='If data=cnn+dailymail, then data-dir must contain two paths for cnn and dailymail seperated by ;.')
-    parser.add_argument('--save-path', required=True)
-    parser.add_argument('--max-word-num', type=int, default=50000)
+    parser.add_argument('--tokenized_path', help='file contain tokenized data')
+    parser.add_argument('--save_tokenized_path', help='save tokenized data to path')
+    parser.add_argument('--save_path', required=True)
+    parser.add_argument('--max_word_num', type=int, default=50000)
+    parser.add_argument('--max_docs', type=int, default=-1)
     args = parser.parse_args()
 
-    print('Loading glove......')
-    # glove = pickle.load(open(args.glove, 'rb'))
-    glove = load_glove_gensim(args.glove)
-
-    print("Number token in glove : ", glove.syn0.shape[0])
-    word_dim = len(glove['the'])
-    print('Word dim = %d' % word_dim)
-
     print('Reading data......')
-    data, length = datasets[args.data](args.data, args.data_dir)
+    if args.tokenized_path:
+        tokenized_data_file = open(args.tokenized_path, 'rb')
+        data = pickle.load(tokenized_data_file)
+        length = pickle.load(tokenized_data_file)
+        tokenized_data_file.close()
+        print("Load tokenized data from {} done".format(args.tokenized_path))
+    else:
+        assert(args.save_tokenized_path is not None)
+        data, length = datasets[args.data](args.data, args.data_dir, args.max_docs)
+
+        # Save tokenized data
+        tokenized_data_file = open(args.save_tokenized_path, 'wb')
+        pickle.dump(data, tokenized_data_file)
+        pickle.dump(length, tokenized_data_file)
+        tokenized_data_file.close()
+        print("Save tokenized data to {} done".format(args.tokenized_path))
+
     print('train/valid/test: %d/%d/%d' % tuple([len(_) for _ in data]))         # Number (doc,sum) in data
 
     print('Count word frequency only from train set......')
     wtof = {}
-    if (args.data == 'duc2007'):
+    if args.data == 'duc2007':
         pass
     else:
         for j in range(len(data[0])):  # j-th sample of train set
@@ -191,6 +207,14 @@ def main():
         wtof = Counter(wtof).most_common(args.max_word_num)     # List of tuple (word, num_occurrence) with decrease frequency order
         needed_words = {w[0]: w[1] for w in wtof}
         # print('Preserve word num: %d. Examples: %s %s' % (len(needed_words), wtof[0][0], wtof[1][0]))
+
+    print('Loading glove......')
+    # glove = pickle.load(open(args.glove, 'rb'))
+    glove = load_glove_gensim(args.glove)
+
+    print("Number token in glove : ", glove.syn0.shape[0])
+    word_dim = len(glove['the'])
+    print('Word dim = %d' % word_dim)
 
     itow = ['<pad>', '<unk>']
     wtoi = {'<pad>': 0, '<unk>': 1}
