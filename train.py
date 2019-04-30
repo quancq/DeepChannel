@@ -73,6 +73,7 @@ def trainChannelModel(args):
 
     opt_name = args.optimizer
     scheduler_name = "MLR"
+    model_name = args.model_name
 
     if args.resume_ckpt:
         checkpoints = torch.load(args.resume_ckpt)
@@ -235,8 +236,8 @@ def trainChannelModel(args):
             states = dict(epoch=epoch_num, se_state_dict=sentenceEncoder.state_dict(),
                           channel_state_dict=channelModel.state_dict(),
                           optimizer=optimizer.state_dict(), scheduler=scheduler.state_dict(),
-                          opt_name=opt_name, scheduler_name=scheduler_name, model_name=net.name)
-            save_ckpt_path = os.path.join(args.save_dir, "checkpoints", '{}_ckpt_{}.pth'.format(net.name, epoch_num))
+                          opt_name=opt_name, scheduler_name=scheduler_name, model_name=model_name)
+            save_ckpt_path = os.path.join(args.save_dir, "checkpoints", '{}_ckpt_{}.pth'.format(model_name, epoch_num))
             torch.save(states, save_ckpt_path)
 
             # torch.save(sentenceEncoder.state_dict(),
@@ -437,6 +438,7 @@ def parse_args():
     parser.add_argument('--offline-pyrouge-index-json', help='json file of offline max pyrouge index')
     parser.add_argument('--save-dir', type=str, default="./experiments", help='path to save checkpoints and logs')
     parser.add_argument('--resume_ckpt', help='path contain pretrained model')
+    parser.add_argument('--model_name', help='deep_channel')
     parser.add_argument('--validation', action='store_true')
     args = parser.parse_args()
     return args
