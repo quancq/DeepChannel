@@ -111,22 +111,22 @@ def trainChannelModel(args):
         # sentenceEncoder.load_state_dict(torch.load(os.path.join(args.save_dir, 'se.pkl')))
         # channelModel.load_state_dict(torch.load(os.path.join(args.save_dir, 'channel.pkl')))
 
-    if args.validation:
-        validate(data, sentenceEncoder, channelModel, device, args)
-        return 0
+    # if args.validation:
+    #     validate(data, sentenceEncoder, channelModel, device, args)
+    #     return 0
     try:
         os.mkdir(os.path.join(args.save_dir, "checkpoints"))
     except:
         pass
 
     end_epoch = args.max_epoch
-    for epoch_num in range(start_epoch, end_epoch):
+    for epoch_num in range(start_epoch, end_epoch + 1):
         scheduler.step()
         if args.anneal:
             # from 1 to 0.01 as the epoch_num increases
             channelModel.temperature = 1 - epoch_num * 0.99 / (args.max_epoch - 1)
 
-        if epoch_num % 1 == 0:
+        if epoch_num % 1 == 0 and args.validation:
             valid_loss, valid_all_loss, valid_acc, valid_all_acc, rouge_score = validate(data, sentenceEncoder,
                                                                                          channelModel, device, args)
             train_writer.add_scalar('validation/loss', valid_loss, epoch_num)
@@ -152,7 +152,7 @@ def trainChannelModel(args):
 
             D = sentenceEncoder(doc, doc_len)
             S_good = sentenceEncoder(sums[0], sums_len[0])
-            neg_sent_embed = sentenceEncoder(sums[1], sums_len[1])
+            # neg_sent_embed = sentenceEncoder(sums[1], sums_len[1])
 
             l = S_good.size(0)
 
@@ -222,11 +222,13 @@ def trainChannelModel(args):
                 nn.utils.clip_grad_norm_(parameters=params, max_norm=args.clip)
                 optimizer.step()
 
-            if iter_count % 100 == 0:
-                logging.info('Epoch %.2f, loss_prob: %.4f, bad_prob: %.4f, good_prob: %.4f, regulation_value: %.4f' % (
-                    progress, loss_prob_term.item(), bad_prob.item(), good_prob.item(), regulation_term.item()))
+            # if iter_count % 100 == 0:
+            logging.info('Train ||Epoch {}/{} || Batch {}||Loss_prob: {:.4f} ||Bad_prob: {:.4f} ||'
+                         'Good_prob: {:.4f} ||Regularization: {:.4f}'.format(
+                            epoch_num, end_epoch, iter_count, loss_prob_term.item(), bad_prob.item(),
+                            good_prob.item(), regulation_term.item()))
 
-        if epoch_num % 1 == 0:
+        if epoch_num % 2 == 0:
             # try:
             #     os.mkdir(os.path.join(args.save_dir, 'checkpoints/' + str(epoch_num)))
             # except:
@@ -266,8 +268,9 @@ def validate(data_, sentenceEncoder_, channelModel_, device_, args):
         num_sent_of_sum = sums[0].size(0)
         D = sentenceEncoder_(doc, doc_len)
         l = D.size(0)
-        if (l < 2):
+        if l < 2:
             continue
+
         doc_matrix = doc.cpu().data.numpy()
         doc_len_arr = doc_len.cpu().data.numpy()
         golden_summ_matrix = sums[0].cpu().data.numpy()
@@ -338,7 +341,7 @@ def validate(data_, sentenceEncoder_, channelModel_, device_, args):
             continue
         D = sentenceEncoder_(doc, doc_len)
         S_good = sentenceEncoder_(sums[0], sums_len[0])
-        neg_sent_embed = sentenceEncoder_(sums[1], sums_len[1])
+        # neg_sent_embed = sentenceEncoder_(sums[1], sums_len[1])
 
         l = S_good.size(0)
         S_bads = []
@@ -379,13 +382,14 @@ def validate(data_, sentenceEncoder_, channelModel_, device_, args):
             bad_probs_vector.append(addition['prob_vector'])
         bad_index = np.argmax([p.item() for p in bad_probs])
         bad_prob = bad_probs[bad_index]
+
         ########### loss ############
         loss_prob_term = bad_prob - good_prob
         loss = loss_prob_term.item()
         loss_arr.append(loss)
         for bad in bad_probs:
             all_loss_arr.append((bad - good_prob).item())
-        if (args.visualize and valid_iter_count % 100 == 0):
+        if args.visualize and valid_iter_count % 100 == 0:
             doc_matrix = doc.cpu().data.numpy()
             doc_len_arr = doc_len.cpu().data.numpy()
             summ_matrix = sums[0].cpu().data.numpy()

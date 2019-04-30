@@ -228,7 +228,7 @@ def main():
     missing_word_neighbors = {}
 
     print('Replace word string with word index and padding zero......')
-    if (args.data == 'duc2007'):
+    if args.data == 'duc2007':
         cnn_data = Dataset(path='/data/c-liang/data/cnndaily_5w_100d.pkl')
         needed_words = cnn_data.wtoi
         wtoi = cnn_data.wtoi
