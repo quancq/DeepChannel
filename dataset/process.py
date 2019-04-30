@@ -38,6 +38,8 @@ def process_document(d, sentence_len_limit):
     global nlp
     if nlp is None:
         nlp = spacy.load('en')
+        print("\n\nSpacy model pipeline contain {} components: {}\n\n".format(len(nlp.pipe_names), nlp.pipeline))
+
     d = d.lower()
     tokenize_d = nlp(d)
     results = []
