@@ -146,6 +146,7 @@ def trainChannelModel(args):
 
     global_batch_idx = (start_epoch - 1) * data.train_size
     end_epoch = args.max_epoch
+    epoch_time = 0
 
     for epoch_num in range(start_epoch, end_epoch + 1):
         scheduler.step()
@@ -272,6 +273,7 @@ def trainChannelModel(args):
             reg_arr.append(reg_val)
 
             batch_time = time.time() - start_batch_time
+            epoch_time += batch_time
 
             if global_batch_idx % 50 == 0:
                 logging.info('Train ||Epoch: {}/{} ||Batch_idx: {}/{} ||(Loss/Bad/Good/Reg) ||'
@@ -288,6 +290,8 @@ def trainChannelModel(args):
             log["Train"]["bad_prob"][str(global_batch_idx)] = bad_prob.item()
             log["Train"]["reg"][str(global_batch_idx)] = regularization_term.item()
             log["Train"]["time"][str(global_batch_idx)] = batch_time
+
+        logging.info("\nTrain || Epoch time: {:.2f}s\n".format(epoch_time))
 
         if epoch_num % 1 == 0:
             # try:
