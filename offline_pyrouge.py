@@ -19,9 +19,9 @@ topn = 5  # -1 means take all document sentences as candidates
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data-path', required=True,
+    parser.add_argument('--data_path', required=True,
                         help='pickle file obtained by dataset dump or datadir for torchtext')
-    parser.add_argument('--save-path', type=str, required=True, help='path to save results')
+    parser.add_argument('--save_path', type=str, required=True, help='path to save results')
     args = parser.parse_args()
     return args
 

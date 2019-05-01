@@ -416,21 +416,21 @@ def validate(data_, sentenceEncoder_, channelModel_, device_, args):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--SE-type', default='GRU', choices=['GRU', 'BiGRU', 'AVG'])
-    parser.add_argument('--word-dim', type=int, default=300, help='dimension of word embeddings')
-    parser.add_argument('--hidden-dim', type=int, default=1024, help='dimension of hidden units per layer')
-    parser.add_argument('--num-layers', type=int, default=1, help='number of layers in LSTM/BiLSTM')
+    parser.add_argument('--SE_type', default='BiGRU', choices=['GRU', 'BiGRU', 'AVG'])
+    parser.add_argument('--word_dim', type=int, default=300, help='dimension of word embeddings')
+    parser.add_argument('--hidden_dim', type=int, default=1024, help='dimension of hidden units per layer')
+    parser.add_argument('--num_layers', type=int, default=1, help='number of layers in LSTM/BiLSTM')
     parser.add_argument('--dropout', type=float, default=0.3)
     parser.add_argument('--margin', type=float, default=1e10, help='margin of hinge loss, must >= 0')
 
     parser.add_argument('--clip', type=float, default=5, help='clip to prevent the too large grad')
     parser.add_argument('--lr', type=float, default=1e-5, help='initial learning rate')
-    parser.add_argument('--weight-decay', type=float, default=1e-5, help='weight decay rate per batch')
-    parser.add_argument('--max-epoch', type=int, default=10)
+    parser.add_argument('--weight_decay', type=float, default=1e-5, help='weight decay rate per batch')
+    parser.add_argument('--max_epoch', type=int, default=10)
     parser.add_argument('--cpu', action='store_true', default=False)
     parser.add_argument('--optimizer', default='adam', choices=['adam', 'sgd', 'adadelta'])
-    parser.add_argument('--batch-size', type=int, default=1, help='batch size for training, not used now')
-    parser.add_argument('--tune-word-embedding', action='store_true', help='specified to fine tune glove vectors')
+    parser.add_argument('--batch_size', type=int, default=1, help='batch size for training, not used now')
+    parser.add_argument('--tune_word_embedding', action='store_true', help='specified to fine tune glove vectors')
     parser.add_argument('--anneal', action='store_true')
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--seed', type=int, default=666, help='random seed')
@@ -439,7 +439,7 @@ def parse_args():
 
     parser.add_argument('--data-path', required=True,
                         help='pickle file obtained by dataset dump or datadir for torchtext')
-    parser.add_argument('--offline-pyrouge-index-json', help='json file of offline max pyrouge index')
+    parser.add_argument('--pyrouge_index', help='json file of offline max pyrouge index')
     parser.add_argument('--save-dir', type=str, default="./experiments", help='path to save checkpoints and logs')
     parser.add_argument('--resume_ckpt', help='path contain pretrained model')
     parser.add_argument('--model_name', default='deep_channel')

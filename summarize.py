@@ -218,22 +218,24 @@ def genSentences(args):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--SE-type', default='GRU', choices=['GRU', 'BiGRU', 'AVG'])
+    parser.add_argument('--SE_type', default='BiGRU', choices=['GRU', 'BiGRU', 'AVG'])
     parser.add_argument('--method', default='iterative',
                         choices=['random', 'top-k-simple', 'top-k', 'iterative', 'iterative-delete', 'lead-3'])
-    parser.add_argument('--word-dim', type=int, default=300, help='dimension of word embeddings')
-    parser.add_argument('--hidden-dim', type=int, default=1024, help='dimension of hidden units per layer')
-    parser.add_argument('--num-layers', type=int, default=1, help='number of layers in LSTM/BiLSTM')
-    parser.add_argument('--cuda', action='store_true', default=True)
-    parser.add_argument('--data-path', required=True,
+    parser.add_argument('--word_dim', type=int, default=300, help='dimension of word embeddings')
+    parser.add_argument('--hidden_dim', type=int, default=1024, help='dimension of hidden units per layer')
+    parser.add_argument('--num_layers', type=int, default=1, help='number of layers in LSTM/BiLSTM')
+    parser.add_argument('--cpu', action='store_true')
+    parser.add_argument('--data_path', required=True,
                         help='pickle file obtained by dataset dump or datadir for torchtext')
-    parser.add_argument('--save-dir', type=str, help='path to save checkpoints and logs')
+    parser.add_argument('--save_dir', type=str, help='path to save checkpoints and logs')
     args = parser.parse_args()
     return args
 
 
 def prepare():
     args = parse_args()
+    args.cuda = not args.cpu
+
     fileHandler = logging.FileHandler(os.path.join(args.save_dir, 'examples.log'))
     fileHandler.setFormatter(logFormatter)
     rootLogger.addHandler(fileHandler)

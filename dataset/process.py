@@ -297,7 +297,6 @@ def main():
     print('Shape of weight matrix:')
     print(weight_matrix.shape)
 
-    print('Dumping......')
     # print(data[2][0][0], data[2][1][0])
     save_file = open(args.save_path, 'wb')
     pickle.dump(data, save_file)
@@ -306,8 +305,10 @@ def main():
     pickle.dump(wtoi, save_file)
     pickle.dump(itow, save_file)
     save_file.close()
+    print('Dumping to {} done'.format(args.save_path))
 
     print("Time: {:.2f}s".format(time.time() - start_time))
+
 
 if __name__ == "__main__":
     main()
