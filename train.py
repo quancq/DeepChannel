@@ -306,6 +306,11 @@ def trainChannelModel(args):
             # except:
             #     pass
 
+            log["Train"]["loss_avg"] = loss_avg
+            log["Train"]["good_prob_avg"] = good_prob_avg
+            log["Train"]["bad_prob_avg"] = bad_prob_avg
+            log["Train"]["reg_avg"] = reg_avg
+
             # Save checkpoints
             states = dict(epoch=epoch_num, se_state_dict=sentenceEncoder.state_dict(),
                           channel_state_dict=channelModel.state_dict(),
