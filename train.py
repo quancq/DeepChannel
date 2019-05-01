@@ -278,12 +278,12 @@ def trainChannelModel(args):
             total_batch_time += batch_time
             epoch_time += batch_time
 
-            if global_batch_idx % 50 == 0:
+            if (batch_iter + 1) % 50 == 0:
                 logging.info('\nTrain || Epoch: {}/{} || Batch: {}/{} || (Loss/Bad/Good/Reg) \n'
-                             'Curr: ({: .4f}, {: .4f}, {: .4f}, {:.0f}) || '
-                             'Avg: ({: .4f}, {: .4f}, {: .4f}, {:.0f}) || '
+                             'Curr: ({: .4f}, {: .4f}, {: .4f}, {:.2f}) || '
+                             'Avg: ({: .4f}, {: .4f}, {: .4f}, {:.2f}) || '
                              'Batch_time: {:.4f}s || Total_time: {:.4f}s'.format(
-                                epoch_num, end_epoch, batch_iter, data.train_size,
+                                epoch_num, end_epoch, batch_iter + 1, data.train_size,
                                 loss_val, bad_prob_val, good_prob_val, reg_val,
                                 loss_avg, bad_prob_avg, good_prob_avg, reg_avg,
                                 batch_time, total_batch_time))
