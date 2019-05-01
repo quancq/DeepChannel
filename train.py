@@ -299,7 +299,8 @@ def trainChannelModel(args):
             states = dict(epoch=epoch_num, se_state_dict=sentenceEncoder.state_dict(),
                           channel_state_dict=channelModel.state_dict(),
                           optimizer=optimizer.state_dict(), scheduler=scheduler.state_dict(),
-                          opt_name=opt_name, scheduler_name=scheduler_name, model_name=model_name)
+                          opt_name=opt_name, scheduler_name=scheduler_name, model_name=model_name,
+                          log=log)
             save_ckpt_path = os.path.join(args.save_dir, "checkpoints", '{}_ckpt_{}.pth'.format(model_name, epoch_num))
             torch.save(states, save_ckpt_path)
 
