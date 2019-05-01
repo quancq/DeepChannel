@@ -104,7 +104,7 @@ def trainChannelModel(args):
     }[opt_name]
 
     optimizer = optimizer_class(params=params, lr=args.lr, weight_decay=args.weight_decay)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5, 10, 20, 30], gamma=0.5)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10, 20, 30, 40, 50], gamma=0.5)
 
     train_writer = SummaryWriter(os.path.join(args.save_dir, 'log', 'train'))
     tic = time.time()
