@@ -281,7 +281,7 @@ def trainChannelModel(args):
             if global_batch_idx % 50 == 0:
                 logging.info('\nTrain || Epoch: {}/{} || Batch: {}/{} || (Loss/Bad/Good/Reg) \n'
                              'Curr: ({: .4f}, {: .4f}, {: .4f}, {:.0f}) || '
-                             'Avg: ({: .4f}, {: .4f}, {: .4f}, {:.0f}) ||'
+                             'Avg: ({: .4f}, {: .4f}, {: .4f}, {:.0f}) || '
                              'Batch_time: {:.4f}s || Total_time: {:.4f}s'.format(
                                 epoch_num, end_epoch, batch_iter, data.train_size,
                                 loss_val, bad_prob_val, good_prob_val, reg_val,
