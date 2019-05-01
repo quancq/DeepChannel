@@ -3,8 +3,9 @@ import time
 import argparse
 import logging
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)-8s %(message)s')
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)-8s %(message)s')
 # logFormatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(message)s')
 logFormatter = logging.Formatter('%(message)s')
 rootLogger = logging.getLogger()
 import random
@@ -276,8 +277,8 @@ def trainChannelModel(args):
             epoch_time += batch_time
 
             if global_batch_idx % 50 == 0:
-                logging.info('Train ||Epoch: {}/{} ||Batch_idx: {}/{} ||(Loss/Bad/Good/Reg) ||'
-                             'Curr: ({:.2f},{:.2f},{:.2f}) ||Avg: ({:.4f},{:.2f},{:.2f}) ||'
+                logging.info('Train||Epoch: {}/{}||Batch_idx: {}/{}||(Loss/Bad/Good/Reg) ||'
+                             'Curr: ({:.2f},{:.2f},{:.2f},{:.2f}) ||Avg: ({:.4f},{:.2f},{:.2f},{:.2f}) ||'
                              'Batch_time: {:.4f}s'.format(
                                 epoch_num, end_epoch, batch_iter, data.train_size,
                                 loss_val, bad_prob_val, good_prob_val, reg_val,
