@@ -437,10 +437,10 @@ def parse_args():
     parser.add_argument('--alpha', type=float, default=0.001, help='weight of regularization term')
     parser.add_argument('--fraction', type=float, default=1, help='fraction of training set reduction')
 
-    parser.add_argument('--data-path', required=True,
+    parser.add_argument('--data_path', required=True,
                         help='pickle file obtained by dataset dump or datadir for torchtext')
     parser.add_argument('--pyrouge_index', help='json file of offline max pyrouge index')
-    parser.add_argument('--save-dir', type=str, default="./experiments", help='path to save checkpoints and logs')
+    parser.add_argument('--save_dir', type=str, default="./experiments", help='path to save checkpoints and logs')
     parser.add_argument('--resume_ckpt', help='path contain pretrained model')
     parser.add_argument('--model_name', default='deep_channel')
     parser.add_argument('--validation', action='store_true')
