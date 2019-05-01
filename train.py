@@ -87,13 +87,13 @@ def trainChannelModel(args):
         log.update(dict(Current_Time=curr_time, Args=vars(args)))
     else:
         log = {
-            "Train": dict(loss={}, good_prob={}, bad_prob={}, reg={},
+            "Train": dict(loss={}, good_prob={}, bad_prob={}, reg={}, time={},
                           loss_avg=0, good_prob_avg=0, bad_prob_avg=0, reg_avg=0),
             "Valid": dict(loss={}, good_prob={}, bad_prob={}, reg={}),
             "Args": vars(args),
             "Current_Time": curr_time,
             "Best_Valid_Epochs": [],
-            "Epoch_Tize": data.train_size,
+            "Epoch_Size": data.train_size,
         }
 
     optimizer_class = {
@@ -283,6 +283,9 @@ def trainChannelModel(args):
                                 loss_val, bad_prob_val, good_prob_val, reg_val,
                                 loss_avg, bad_prob_avg, good_prob_avg, reg_avg,
                                 batch_time))
+                writer_iter = int(global_batch_idx / 50)
+                train_writer.add_scalar('train/loss', loss_val, writer_iter)
+                train_writer.add_scalar('train/loss_avg', loss_avg, writer_iter)
 
             # Update log
             log["Train"]["loss"][str(global_batch_idx)] = loss.item()
@@ -314,6 +317,8 @@ def trainChannelModel(args):
             #            os.path.join(args.save_dir, 'checkpoints/' + str(epoch_num) + '/channel.pkl'))
 
     [rootLogger.removeHandler(h) for h in rootLogger.handlers if isinstance(h, logging.FileHandler)]
+    train_writer.export_scalars_to_json(os.path.join(args.save_dir, "all_scalars.json"))
+    train_writer.close()
 
 
 def validate(data_, sentenceEncoder_, channelModel_, device_, args):
@@ -545,8 +550,10 @@ def prepare():
 
 
 def main():
+    start_script_time = time.time()
     args = prepare()
     trainChannelModel(args)
+    print("\n\nTime run script: {:.2f}s".format(time.time() - start_script_time))
 
 
 if __name__ == '__main__':
