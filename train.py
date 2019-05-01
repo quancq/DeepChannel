@@ -210,7 +210,12 @@ def trainChannelModel(args):
             # Change original code
             candidate_rand_indexes = list(range(D.size(0)))
             candidate_rand_indexes.remove(best_index)
-            worse_indexes = random.sample(candidate_rand_indexes, min(D.size(0), 1))
+            try:
+                worse_indexes = random.sample(candidate_rand_indexes, min(D.size(0) - 1, 1))
+            except:
+                continue
+            if len(worse_indexes) == 0:
+                continue
 
             temp_good = []
             for i in range(l):
