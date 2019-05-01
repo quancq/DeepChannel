@@ -199,6 +199,8 @@ def main():
 
     print('Count word frequency only from train set......')
     wtof = {}
+    num_removed_words = 0
+    org_vocab_size = -1
     if args.data == 'duc2007':
         pass
     else:
@@ -207,16 +209,19 @@ def main():
                 for l in range(len(data[0][j][k])):  # l-th sentence
                     for word in data[0][j][k][l]:
                         wtof[word] = wtof.get(word, 0) + 1
-
+        org_vocab_size = len(wtof)
+        num_removed_words = max(org_vocab_size - args.max_word_num, 0)
         wtof = Counter(wtof).most_common(args.max_word_num)     # List of tuple (word, num_occurrence) with decrease frequency order
         needed_words = {w[0]: w[1] for w in wtof}
         # print('Preserve word num: %d. Examples: %s %s' % (len(needed_words), wtof[0][0], wtof[1][0]))
 
+    print("Original vocab size  : ", org_vocab_size)
+    print("Number removed words : ", num_removed_words)
     print('Loading glove......')
     # glove = pickle.load(open(args.glove, 'rb'))
     glove = load_glove_gensim(args.glove)
 
-    print("Number token in glove : ", glove.syn0.shape[0])
+    print("Number words in glove : ", glove.syn0.shape[0])
     word_dim = len(glove['the'])
     print('Word dim = %d' % word_dim)
 
@@ -282,7 +287,8 @@ def main():
                     # np.array for all documents/summaries
                     # shape of each document/summary: (# sentence, max length)
 
-    print('Calculate vectors for missing words by averaging neighbors......')
+    print('Calculate vectors for {} missing words by averaging neighbors......'.format(
+        len(missing_word_neighbors)))
     # print(data)
     if args.data == 'duc2007':
         weight_matrix = cnn_data.weight

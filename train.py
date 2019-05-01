@@ -141,7 +141,7 @@ def trainChannelModel(args):
             sentenceEncoder.train()
             channelModel.train()
 
-            progress = epoch_num + batch_iter / data.train_size
+            # progress = epoch_num + batch_iter / data.train_size
             iter_count += 1
 
             doc, sums, doc_len, sums_len = recursive_to_device(device, *train_batch)
@@ -161,13 +161,14 @@ def trainChannelModel(args):
             doc_len_arr = doc_len.cpu().data.numpy()
             summ_matrix = sums[0].cpu().data.numpy()
             summ_len_arr = sums_len[0].cpu().data.numpy()
-            doc_ = []
-            summ_ = []
-            for i in range(np.shape(doc_matrix)[0]):
-                doc_.append(" ".join([data.itow[x] for x in doc_matrix[i]][:doc_len_arr[i]]))
+
+            # doc_ = []
+            # summ_ = []
+            # for i in range(np.shape(doc_matrix)[0]):
+            #     doc_.append(" ".join([data.itow[x] for x in doc_matrix[i]][:doc_len_arr[i]]))
 
             index = random.randint(0, l - 1)
-            summ_.append(" ".join([data.itow[x] for x in summ_matrix[index]][:summ_len_arr[index]]))
+            # summ_.append(" ".join([data.itow[x] for x in summ_matrix[index]][:summ_len_arr[index]]))
 
             # ----------- fetch best_index from pyrouge_max_index --------
             ori_index = data.train_ori_index[batch_iter]
@@ -211,9 +212,9 @@ def trainChannelModel(args):
             ########### loss ############
             loss_prob_term = bad_prob - good_prob
             n, m = good_attention_weight.size()
-            regulation_term = torch.norm(
+            regularization_term = torch.norm(
                 torch.mm(good_attention_weight.t(), good_attention_weight) - n / m * torch.eye(m).to(device), 2)
-            loss = loss_prob_term + args.alpha * regulation_term
+            loss = loss_prob_term + args.alpha * regularization_term
 
             if loss_prob_term.item() > -args.margin:
                 # Chi optimize khi model kem
@@ -223,12 +224,12 @@ def trainChannelModel(args):
                 optimizer.step()
 
             # if iter_count % 100 == 0:
-            logging.info('Train ||Epoch {}/{} || Batch {}||Loss_prob: {:.4f} ||Bad_prob: {:.4f} ||'
-                         'Good_prob: {:.4f} ||Regularization: {:.4f}'.format(
-                            epoch_num, end_epoch, iter_count, loss_prob_term.item(), bad_prob.item(),
-                            good_prob.item(), regulation_term.item()))
+            logging.info('Train ||Epoch {}/{} ||Batch_idx {}/{} ||Loss_prob: {:.4f} ||Bad_prob: {:.4f} ||'
+                         'Good_prob: {:.4f} ||Reg: {:.2f}'.format(
+                            epoch_num, end_epoch, batch_iter, data.train_size, loss_prob_term.item(), bad_prob.item(),
+                            good_prob.item(), regularization_term.item()))
 
-        if epoch_num % 2 == 0:
+        if epoch_num % 1 == 0:
             # try:
             #     os.mkdir(os.path.join(args.save_dir, 'checkpoints/' + str(epoch_num)))
             # except:
