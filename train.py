@@ -478,18 +478,18 @@ def validate(data_, sentenceEncoder_, channelModel_, device_, args):
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--pyrouge_index', required=True, help='json file of offline max pyrouge index')
+    parser.add_argument('--data_path', required=True, help='pickle file obtained by dataset dump or datadir for torchtext')
+    parser.add_argument('--max_epoch', type=int, default=10)
+
+    parser.add_argument('--resume_ckpt', help='path contain pretrained model')
+    parser.add_argument('--save_dir', type=str, default="./experiments", help='path to save checkpoints and logs')
+    parser.add_argument('--fix_word_embedding', action='store_true', help='specified to fix embedding vectors')
     parser.add_argument('--SE_type', default='BiGRU', choices=['GRU', 'BiGRU', 'AVG'])
     parser.add_argument('--word_dim', type=int, default=300, help='dimension of word embeddings')
     parser.add_argument('--hidden_dim', type=int, default=1024, help='dimension of hidden units per layer')
-    parser.add_argument('--max_epoch', type=int, default=10)
-    parser.add_argument('--data_path', required=True,
-                        help='pickle file obtained by dataset dump or datadir for torchtext')
-    parser.add_argument('--pyrouge_index', help='json file of offline max pyrouge index')
-    parser.add_argument('--save_dir', type=str, default="./experiments", help='path to save checkpoints and logs')
-    parser.add_argument('--resume_ckpt', help='path contain pretrained model')
     parser.add_argument('--model_name', default='deep_channel')
     parser.add_argument('--validation', action='store_true')
-    parser.add_argument('--fix_word_embedding', action='store_true', help='specified to fix embedding vectors')
     parser.add_argument('--optimizer', default='adam', choices=['adam', 'sgd', 'adadelta'])
     parser.add_argument('--lr', type=float, default=1e-5, help='initial learning rate')
 
