@@ -43,7 +43,7 @@ def trainChannelModel(args):
 
     print('Loading offline pyrouge max index.....')
     # the index of document sentence which has maximum pyrouge score with current summary sentence
-    pyrouge_max_index = json.load(open(args.offline_pyrouge_index_json))
+    pyrouge_max_index = json.load(open(args.pyrouge_index))
 
     print('Building model......')
     args.num_words = len(data.weight)  # number of words
