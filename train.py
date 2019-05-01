@@ -4,7 +4,8 @@ import argparse
 import logging
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)-8s %(message)s')
-logFormatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
+# logFormatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
+logFormatter = logging.Formatter('%(message)s')
 rootLogger = logging.getLogger()
 import random
 import shutil
@@ -55,7 +56,7 @@ def trainChannelModel(args):
 
     print('Initializing word embeddings......')
     sentenceEncoder.word_embedding.weight.data.set_(data.weight)
-    if not args.tune_word_embedding:
+    if args.fix_word_embedding:
         sentenceEncoder.word_embedding.weight.requires_grad = False
         print('Fix word embeddings')
     else:
@@ -74,11 +75,26 @@ def trainChannelModel(args):
     opt_name = args.optimizer
     scheduler_name = "MLR"
     model_name = args.model_name
+    curr_time = my_utils.get_time_str()
 
     if args.resume_ckpt:
         checkpoints = torch.load(args.resume_ckpt)
         opt_name = checkpoints["opt_name"]
         scheduler_name = checkpoints["scheduler_name"]
+        print("Load checkpoint from {} done".format(args.resume_ckpt))
+
+        log = checkpoints["log"]
+        log.update(dict(Current_Time=curr_time, Args=vars(args)))
+    else:
+        log = {
+            "Train": dict(loss={}, good_prob={}, bad_prob={}, reg={},
+                          loss_avg=0, good_prob_avg=0, bad_prob_avg=0, reg_avg=0),
+            "Valid": dict(loss={}, good_prob={}, bad_prob={}, reg={}),
+            "Args": vars(args),
+            "Current_Time": curr_time,
+            "Best_Valid_Epochs": [],
+            "Epoch_Tize": data.train_size,
+        }
 
     optimizer_class = {
         'adam': optim.Adam,
@@ -91,7 +107,6 @@ def trainChannelModel(args):
 
     train_writer = SummaryWriter(os.path.join(args.save_dir, 'log', 'train'))
     tic = time.time()
-    iter_count = 0
     loss_arr = []
     valid_loss = 0
     valid_all_loss = 0
@@ -119,7 +134,19 @@ def trainChannelModel(args):
     except:
         pass
 
+    loss_arr = list(log["Train"]["loss"].values())
+    good_prob_arr = list(log["Train"]["good_prob"].values())
+    bad_prob_arr = list(log["Train"]["bad_prob"].values())
+    reg_arr = list(log["Train"]["reg"].values())
+
+    loss_avg = float(log["Train"]["loss_avg"])
+    good_prob_avg = float(log["Train"]["good_prob_avg"])
+    bad_prob_avg = float(log["Train"]["bad_prob_avg"])
+    reg_avg = float(log["Train"]["reg_avg"])
+
+    global_batch_idx = (start_epoch - 1) * data.train_size
     end_epoch = args.max_epoch
+
     for epoch_num in range(start_epoch, end_epoch + 1):
         scheduler.step()
         if args.anneal:
@@ -138,11 +165,13 @@ def trainChannelModel(args):
         eq = 0
         rouge_arr = []
         for batch_iter, train_batch in enumerate(data.gen_train_minibatch()):
+            start_batch_time = time.time()
+
             sentenceEncoder.train()
             channelModel.train()
 
             # progress = epoch_num + batch_iter / data.train_size
-            iter_count += 1
+            global_batch_idx += 1
 
             doc, sums, doc_len, sums_len = recursive_to_device(device, *train_batch)
             num_sent_of_sum = sums[0].size(0)
@@ -156,11 +185,10 @@ def trainChannelModel(args):
 
             l = S_good.size(0)
 
-            S_bads = []
-            doc_matrix = doc.cpu().data.numpy()
-            doc_len_arr = doc_len.cpu().data.numpy()
-            summ_matrix = sums[0].cpu().data.numpy()
-            summ_len_arr = sums_len[0].cpu().data.numpy()
+            # doc_matrix = doc.cpu().data.numpy()
+            # doc_len_arr = doc_len.cpu().data.numpy()
+            # summ_matrix = sums[0].cpu().data.numpy()
+            # summ_len_arr = sums_len[0].cpu().data.numpy()
 
             # doc_ = []
             # summ_ = []
@@ -175,7 +203,11 @@ def trainChannelModel(args):
             assert len(pyrouge_max_index[ori_index]) == l, \
                 "number of pyrouge_max_index[i] must be equal to the number of summary sentences"
             best_index = pyrouge_max_index[ori_index][index]
-            worse_indexes = random.sample(range(D.size(0)), min(D.size(0), 1))
+
+            # Change original code
+            candidate_rand_indexes = list(range(D.size(0)))
+            candidate_rand_indexes.remove(best_index)
+            worse_indexes = random.sample(candidate_rand_indexes, min(D.size(0), 1))
 
             temp_good = []
             for i in range(l):
@@ -186,6 +218,7 @@ def trainChannelModel(args):
 
             S_good = torch.stack(temp_good)
 
+            S_bads = []
             for worse_index in worse_indexes:
                 temp_bad = []
                 for i in range(l):
@@ -223,11 +256,38 @@ def trainChannelModel(args):
                 nn.utils.clip_grad_norm_(parameters=params, max_norm=args.clip)
                 optimizer.step()
 
-            # if iter_count % 100 == 0:
-            logging.info('Train ||Epoch {}/{} ||Batch_idx {}/{} ||Loss_prob: {:.4f} ||Bad_prob: {:.4f} ||'
-                         'Good_prob: {:.4f} ||Reg: {:.2f}'.format(
-                            epoch_num, end_epoch, batch_iter, data.train_size, loss_prob_term.item(), bad_prob.item(),
-                            good_prob.item(), regularization_term.item()))
+            loss_val = loss.item()
+            good_prob_val = good_prob.item()
+            bad_prob_val = bad_prob.item()
+            reg_val = regularization_term.item()
+
+            loss_avg = (loss_avg * len(loss_arr) + loss_val) / (len(loss_arr) + 1)
+            good_prob_avg = (good_prob_avg * len(good_prob_arr) + good_prob_val) / (len(good_prob_arr) + 1)
+            bad_prob_avg = (bad_prob_avg * len(bad_prob_arr) + bad_prob_val) / (len(bad_prob_arr) + 1)
+            reg_avg = (reg_avg * len(reg_arr) + reg_val) / (len(reg_arr) + 1)
+
+            loss_arr.append(loss_val)
+            good_prob_arr.append(good_prob_val)
+            bad_prob_arr.append(bad_prob_val)
+            reg_arr.append(reg_val)
+
+            batch_time = time.time() - start_batch_time
+
+            if global_batch_idx % 50 == 0:
+                logging.info('Train ||Epoch: {}/{} ||Batch_idx: {}/{} ||(Loss/Bad/Good/Reg) ||'
+                             'Curr: ({:.2f},{:.2f},{:.2f}) ||Avg: ({:.4f},{:.2f},{:.2f}) ||'
+                             'Batch_time: {:.4f}s'.format(
+                                epoch_num, end_epoch, batch_iter, data.train_size,
+                                loss_val, bad_prob_val, good_prob_val, reg_val,
+                                loss_avg, bad_prob_avg, good_prob_avg, reg_avg,
+                                batch_time))
+
+            # Update log
+            log["Train"]["loss"][str(global_batch_idx)] = loss.item()
+            log["Train"]["good_prob"][str(global_batch_idx)] = good_prob.item()
+            log["Train"]["bad_prob"][str(global_batch_idx)] = bad_prob.item()
+            log["Train"]["reg"][str(global_batch_idx)] = regularization_term.item()
+            log["Train"]["time"][str(global_batch_idx)] = batch_time
 
         if epoch_num % 1 == 0:
             # try:
@@ -303,7 +363,7 @@ def validate(data_, sentenceEncoder_, channelModel_, device_, args):
                 probs.append(temp_prob.item())
             probs_arr.append(probs)
             best_index = np.argmax(probs)
-            while (best_index in selected_indexs):
+            while best_index in selected_indexs:
                 probs[best_index] = -100000
                 best_index = np.argmax(probs)
             selected_indexs.append(best_index)
@@ -420,24 +480,7 @@ def parse_args():
     parser.add_argument('--SE_type', default='BiGRU', choices=['GRU', 'BiGRU', 'AVG'])
     parser.add_argument('--word_dim', type=int, default=300, help='dimension of word embeddings')
     parser.add_argument('--hidden_dim', type=int, default=1024, help='dimension of hidden units per layer')
-    parser.add_argument('--num_layers', type=int, default=1, help='number of layers in LSTM/BiLSTM')
-    parser.add_argument('--dropout', type=float, default=0.3)
-    parser.add_argument('--margin', type=float, default=1e10, help='margin of hinge loss, must >= 0')
-
-    parser.add_argument('--clip', type=float, default=5, help='clip to prevent the too large grad')
-    parser.add_argument('--lr', type=float, default=1e-5, help='initial learning rate')
-    parser.add_argument('--weight_decay', type=float, default=1e-5, help='weight decay rate per batch')
     parser.add_argument('--max_epoch', type=int, default=10)
-    parser.add_argument('--cpu', action='store_true', default=False)
-    parser.add_argument('--optimizer', default='adam', choices=['adam', 'sgd', 'adadelta'])
-    parser.add_argument('--batch_size', type=int, default=1, help='batch size for training, not used now')
-    parser.add_argument('--tune_word_embedding', action='store_true', help='specified to fine tune glove vectors')
-    parser.add_argument('--anneal', action='store_true')
-    parser.add_argument('--debug', action='store_true')
-    parser.add_argument('--seed', type=int, default=666, help='random seed')
-    parser.add_argument('--alpha', type=float, default=0.001, help='weight of regularization term')
-    parser.add_argument('--fraction', type=float, default=1, help='fraction of training set reduction')
-
     parser.add_argument('--data_path', required=True,
                         help='pickle file obtained by dataset dump or datadir for torchtext')
     parser.add_argument('--pyrouge_index', help='json file of offline max pyrouge index')
@@ -445,6 +488,23 @@ def parse_args():
     parser.add_argument('--resume_ckpt', help='path contain pretrained model')
     parser.add_argument('--model_name', default='deep_channel')
     parser.add_argument('--validation', action='store_true')
+    parser.add_argument('--fix_word_embedding', action='store_true', help='specified to fix embedding vectors')
+    parser.add_argument('--optimizer', default='adam', choices=['adam', 'sgd', 'adadelta'])
+    parser.add_argument('--lr', type=float, default=1e-5, help='initial learning rate')
+
+    parser.add_argument('--num_layers', type=int, default=1, help='number of layers in LSTM/BiLSTM')
+    parser.add_argument('--dropout', type=float, default=0.3)
+    parser.add_argument('--margin', type=float, default=1e10, help='margin of hinge loss, must >= 0')
+    parser.add_argument('--clip', type=float, default=5, help='clip to prevent the too large grad')
+    parser.add_argument('--weight_decay', type=float, default=1e-5, help='weight decay rate per batch')
+    parser.add_argument('--cpu', action='store_true', default=False)
+    parser.add_argument('--batch_size', type=int, default=1, help='batch size for training, not used now')
+    parser.add_argument('--anneal', action='store_true')
+    parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--seed', type=int, default=666, help='random seed')
+    parser.add_argument('--alpha', type=float, default=0.001, help='weight of regularization term')
+    parser.add_argument('--fraction', type=float, default=1, help='fraction of training set reduction')
+
     args = parser.parse_args()
     return args
 
