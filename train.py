@@ -147,9 +147,10 @@ def trainChannelModel(args):
 
     global_batch_idx = (start_epoch - 1) * data.train_size
     end_epoch = args.max_epoch
-    epoch_time = 0
+    total_batch_time = 0
 
     for epoch_num in range(start_epoch, end_epoch + 1):
+        epoch_time = 0
         scheduler.step()
         if args.anneal:
             # from 1 to 0.01 as the epoch_num increases
@@ -274,16 +275,18 @@ def trainChannelModel(args):
             reg_arr.append(reg_val)
 
             batch_time = time.time() - start_batch_time
+            total_batch_time += batch_time
             epoch_time += batch_time
 
             if global_batch_idx % 50 == 0:
-                logging.info('Train||Epoch: {}/{}||Batch_idx: {}/{}||(Loss/Bad/Good/Reg) ||'
-                             'Curr: ({:.2f},{:.2f},{:.2f},{:.2f}) ||Avg: ({:.4f},{:.2f},{:.2f},{:.2f}) ||'
-                             'Batch_time: {:.4f}s'.format(
+                logging.info('\nTrain || Epoch: {}/{} || Batch: {}/{} || (Loss/Bad/Good/Reg) \n'
+                             'Curr: ({: .4f}, {: .4f}, {: .4f}, {:.0f}) || '
+                             'Avg: ({: .4f}, {: .4f}, {: .4f}, {:.0f}) ||'
+                             'Batch_time: {:.4f}s || Total_time: {:.4f}s'.format(
                                 epoch_num, end_epoch, batch_iter, data.train_size,
                                 loss_val, bad_prob_val, good_prob_val, reg_val,
                                 loss_avg, bad_prob_avg, good_prob_avg, reg_avg,
-                                batch_time))
+                                batch_time, total_batch_time))
                 writer_iter = int(global_batch_idx / 50)
                 train_writer.add_scalar('train/loss', loss_val, writer_iter)
                 train_writer.add_scalar('train/loss_avg', loss_avg, writer_iter)
