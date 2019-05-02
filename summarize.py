@@ -72,13 +72,17 @@ def evalLead3(args):
 
 def genSentences(args):
     np.set_printoptions(threshold=1e10)
+
     print('Loading data......')
     data = Dataset(path=args.data_path)
+
     print('Building model......')
     args.num_words = len(data.weight)  # number of words
+
     sentenceEncoder = SentenceEmbedding(**vars(args))
     args.se_dim = sentenceEncoder.getDim()  # sentence embedding dim
     channelModel = ChannelModel(**vars(args))
+
     print('Initializing word embeddings......')
     sentenceEncoder.word_embedding.weight.data.set_(data.weight)
     sentenceEncoder.word_embedding.weight.requires_grad = False
@@ -218,7 +222,7 @@ def genSentences(args):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--SE_type', default='BiGRU', choices=['GRU', 'BiGRU', 'AVG'])
+    parser.add_argument('--SE_type', default='BiGRU', choices=['GRU', 'BiGRU', 'LSTM', 'BiLSTM', 'AVG'])
     parser.add_argument('--method', default='iterative',
                         choices=['random', 'top-k-simple', 'top-k', 'iterative', 'iterative-delete', 'lead-3'])
     parser.add_argument('--word_dim', type=int, default=300, help='dimension of word embeddings')

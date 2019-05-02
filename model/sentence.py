@@ -4,20 +4,29 @@ from torch.nn import init
 from utils import reverse_padded_sequence
 
 
-class BiGRU(nn.Module):
+class BiRNN(nn.Module):
     '''
     Class nhận input là các word vector, sau đó encode để sinh ra sentence vector
     '''
 
-    def __init__(self, **kwargs):
+    def __init__(self, rnn_type="GRU", **kwargs):
         super().__init__()
         # input của nn.GRU có size là (seq_len, batch, input_size)
-        self.forward_encoder = nn.GRU(input_size=kwargs['word_dim'],        # word_dim = 300 (or 100)
+
+        self.rnn_type = rnn_type
+        if rnn_type == "GRU":
+            rnn = nn.GRU
+        elif rnn_type == "LSTM":
+            rnn == nn.LSTM
+        else:
+            raise "Rnn type {} is not valid".format(rnn_type)
+
+        self.forward_encoder = rnn(input_size=kwargs['word_dim'],        # word_dim = 300 (or 100)
                                       hidden_size=kwargs['hidden_dim'],
                                       num_layers=kwargs['num_layers'],
                                       # dropout=kwargs['dropout'])
                                       dropout=0)
-        self.backward_encoder = nn.GRU(input_size=kwargs['word_dim'],
+        self.backward_encoder = rnn(input_size=kwargs['word_dim'],
                                        hidden_size=kwargs['hidden_dim'],
                                        num_layers=kwargs['num_layers'],
                                        dropout=0)
@@ -56,10 +65,10 @@ class BiGRU(nn.Module):
         return output
 
 
-class BiGRU_wrapper(BiGRU):
+class BiRNN_wrapper(BiRNN):
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, rnn_type="GRU", **kwargs):
+        super().__init__(rnn_type, **kwargs)
 
     def forward(self, input, length):
         # input.size = (batch_size, seq_len, input_dim)
@@ -86,11 +95,20 @@ class BiGRU_wrapper(BiGRU):
         return output  # [bsz, 2*h_dim]
 
 
-class GRU_wrapper(nn.Module):
+class RNN_wrapper(nn.Module):
 
-    def __init__(self, **kwargs):
+    def __init__(self, rnn_type="GRU", **kwargs):
         super().__init__()
-        self.encoder = nn.GRU(input_size=kwargs['word_dim'],
+
+        self.rnn_type = rnn_type
+        if rnn_type == "GRU":
+            rnn = nn.GRU
+        elif rnn_type == "LSTM":
+            rnn == nn.LSTM
+        else:
+            raise "Rnn type {} is not valid".format(rnn_type)
+
+        self.encoder = rnn(input_size=kwargs['word_dim'],
                               hidden_size=kwargs['hidden_dim'],
                               num_layers=kwargs['num_layers'],
                               dropout=kwargs['dropout'])
@@ -143,14 +161,23 @@ class SentenceEmbedding(nn.Module):
                                            embedding_dim=kwargs['word_dim'])
         self.SE_type = kwargs['SE_type']
         if self.SE_type == 'GRU':
-            self.encoder = GRU_wrapper(**kwargs)
+            self.encoder = RNN_wrapper(rnn_type="GRU", **kwargs)
             self.dim = kwargs['hidden_dim']
         elif self.SE_type == 'BiGRU':
-            self.encoder = BiGRU_wrapper(**kwargs)
+            self.encoder = BiRNN_wrapper(rnn_type="GRU", **kwargs)
             self.dim = 2 * kwargs['hidden_dim']
+
+        elif self.SE_type == 'LSTM':
+            self.encoder = RNN_wrapper(rnn_type="LSTM", **kwargs)
+            self.dim = kwargs['hidden_dim']
+        elif self.SE_type == 'BiLSTM':
+            self.encoder = BiRNN_wrapper(rnn_type="LSTM", **kwargs)
+            self.dim = 2 * kwargs['hidden_dim']
+
         elif self.SE_type == 'AVG':
             self.encoder = AVG_wrapper(**kwargs)
             self.dim = kwargs['word_dim']
+
         self.reset_parameters()
 
     def reset_parameters(self):

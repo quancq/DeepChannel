@@ -55,13 +55,13 @@ def trainChannelModel(args):
     logging.info(sentenceEncoder)
     logging.info(channelModel)
 
-    print('Initializing word embeddings......')
-    sentenceEncoder.word_embedding.weight.data.set_(data.weight)
-    if args.fix_word_embedding:
-        sentenceEncoder.word_embedding.weight.requires_grad = False
-        print('Fix word embeddings')
-    else:
-        print('Tune word embeddings')
+    # print('Initializing word embeddings......')
+    # sentenceEncoder.word_embedding.weight.data.set_(data.weight)
+    # if args.fix_word_embedding:
+    #     sentenceEncoder.word_embedding.weight.requires_grad = False
+    #     print('Fix word embeddings')
+    # else:
+    #     print('Tune word embeddings')
 
     device = torch.device('cuda' if args.cuda else 'cpu')
     if args.cuda:
@@ -126,6 +126,15 @@ def trainChannelModel(args):
 
         # sentenceEncoder.load_state_dict(torch.load(os.path.join(args.save_dir, 'se.pkl')))
         # channelModel.load_state_dict(torch.load(os.path.join(args.save_dir, 'channel.pkl')))
+    else:
+        print('Initializing word embeddings......')
+        sentenceEncoder.word_embedding.weight.data.set_(data.weight)
+
+    if args.fix_word_embedding:
+        sentenceEncoder.word_embedding.weight.requires_grad = False
+        print('Fix word embeddings')
+    else:
+        print('Tune word embeddings')
 
     # if args.validation:
     #     validate(data, sentenceEncoder, channelModel, device, args)
@@ -305,7 +314,7 @@ def trainChannelModel(args):
 
         logging.info("\nTrain || Epoch time: {:.2f}s\n".format(epoch_time))
 
-        if epoch_num % 1 == 0:
+        if epoch_num % args.save_every_epoch == 0:
             # try:
             #     os.mkdir(os.path.join(args.save_dir, 'checkpoints/' + str(epoch_num)))
             # except:
@@ -503,12 +512,13 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--pyrouge_index', required=True, help='json file of offline max pyrouge index')
     parser.add_argument('--data_path', required=True, help='pickle file obtained by dataset dump or datadir for torchtext')
+    parser.add_argument('--save_every_epoch', type=int, required=True)
     parser.add_argument('--max_epoch', type=int, default=10)
 
     parser.add_argument('--resume_ckpt', help='path contain pretrained model')
     parser.add_argument('--save_dir', type=str, default="./experiments", help='path to save checkpoints and logs')
     parser.add_argument('--fix_word_embedding', action='store_true', help='specified to fix embedding vectors')
-    parser.add_argument('--SE_type', default='BiGRU', choices=['GRU', 'BiGRU', 'AVG'])
+    parser.add_argument('--SE_type', default='BiGRU', choices=['GRU', 'BiGRU', 'LSTM', 'BiLSTM', 'AVG'])
     parser.add_argument('--word_dim', type=int, default=300, help='dimension of word embeddings')
     parser.add_argument('--hidden_dim', type=int, default=1024, help='dimension of hidden units per layer')
     parser.add_argument('--model_name', default='deep_channel')

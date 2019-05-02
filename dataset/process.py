@@ -163,7 +163,7 @@ def main():
         'duc2007': read_duc2007,
     }
     parser = argparse.ArgumentParser()
-    parser.add_argument('--glove', default='./word_embedding/glove/glove_gensim_300d.txt', help='glove gensim format path')
+    parser.add_argument('--we_path', default='./word_embedding/glove/glove_gensim_300d.txt', help='gensim word embedding path')
     parser.add_argument('--data', default='cnn+dailymail', choices=datasets.keys())
     parser.add_argument('--data_dir', default='/data/share/cnn_stories/stories;/data/share/dailymail_stories/stories',
                         help='If data=cnn+dailymail, then data-dir must contain two paths for cnn and dailymail seperated by ;.')
