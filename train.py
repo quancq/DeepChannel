@@ -118,6 +118,10 @@ def trainChannelModel(args):
     print('Start training......')
     if args.resume_ckpt:
         # checkpoints = torch.load(args.resume_ckpt)
+
+        optimizer.load_state_dict(checkpoints["optimizer"])
+        scheduler.load_state_dict(checkpoints["scheduler"])
+
         sentenceEncoder.load_state_dict(checkpoints["se_state_dict"])
         channelModel.load_state_dict(checkpoints["channel_state_dict"])
         start_epoch = checkpoints["epoch"] + 1
