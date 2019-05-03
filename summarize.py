@@ -116,7 +116,9 @@ def genSentences(args):
     redundancy_arr = []
 
     ref_dir = os.path.join(args.save_dir, "ref")
+    my_utils.make_dirs(ref_dir)
     sum_dir = os.path.join(args.save_dir, "sum")
+    my_utils.make_dirs(sum_dir)
 
     for batch_iter, valid_batch in tqdm(enumerate(data.gen_test_minibatch()), total=data.test_size):
         # print(valid_count)
@@ -245,7 +247,9 @@ def genSentences(args):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--ckpt_path', type=str, help='checkpoint path')
+    parser.add_argument('--ckpt_path', required=True, type=str, help='checkpoint path')
+    parser.add_argument('--data_path', required=True,
+                        help='pickle file obtained by dataset dump or datadir for torchtext')
     parser.add_argument('--SE_type', default='BiGRU', choices=['GRU', 'BiGRU', 'LSTM', 'BiLSTM', 'AVG'])
     parser.add_argument('--method', default='iterative',
                         choices=['random', 'top-k-simple', 'top-k', 'iterative', 'iterative-delete', 'lead-3'])
@@ -253,9 +257,7 @@ def parse_args():
     parser.add_argument('--hidden_dim', type=int, default=1024, help='dimension of hidden units per layer')
     parser.add_argument('--num_layers', type=int, default=1, help='number of layers in LSTM/BiLSTM')
     parser.add_argument('--cpu', action='store_true')
-    parser.add_argument('--data_path', required=True,
-                        help='pickle file obtained by dataset dump or datadir for torchtext')
-    parser.add_argument('--save_dir', delault="./eval", type=str, help='dir save evaluate')
+    parser.add_argument('--save_dir', default="./eval", type=str, help='dir save evaluate')
     args = parser.parse_args()
     return args
 
@@ -264,6 +266,7 @@ def prepare():
     args = parse_args()
     args.cuda = not args.cpu
     args.save_dir = os.path.join(args.save_dir, my_utils.get_time_str())
+    my_utils.make_dirs(args.save_dir)
 
     fileHandler = logging.FileHandler(os.path.join(args.save_dir, 'examples.log'))
     fileHandler.setFormatter(logFormatter)
