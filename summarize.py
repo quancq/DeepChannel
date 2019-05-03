@@ -21,6 +21,7 @@ from train import rouge_atten_matrix
 import copy
 from tqdm import tqdm
 from IPython import embed
+import my_utils
 
 
 def rouge_atten_matrix(doc, summ):
@@ -77,16 +78,17 @@ def genSentences(args):
     data = Dataset(path=args.data_path)
 
     print('Building model......')
-    args.num_words = len(data.weight)  # number of words
+    # args.num_words = len(data.weight)  # number of words
 
     sentenceEncoder = SentenceEmbedding(**vars(args))
     args.se_dim = sentenceEncoder.getDim()  # sentence embedding dim
     channelModel = ChannelModel(**vars(args))
 
     print('Initializing word embeddings......')
-    sentenceEncoder.word_embedding.weight.data.set_(data.weight)
-    sentenceEncoder.word_embedding.weight.requires_grad = False
-    print('Fix word embeddings')
+    # sentenceEncoder.word_embedding.weight.data.set_(data.weight)
+    # sentenceEncoder.word_embedding.weight.requires_grad = False
+    # print('Fix word embeddings')
+
     device = torch.device('cuda' if args.cuda else 'cpu')
     if args.cuda:
         print('Transfer models to cuda......')
@@ -97,8 +99,11 @@ def genSentences(args):
     params = [p for p in sentenceEncoder.parameters() if p.requires_grad] + \
              [p for p in channelModel.parameters() if p.requires_grad]
 
-    sentenceEncoder.load_state_dict(torch.load(os.path.join(args.save_dir, 'se.pkl')))
-    channelModel.load_state_dict(torch.load(os.path.join(args.save_dir, 'channel.pkl')))
+    # sentenceEncoder.load_state_dict(torch.load(os.path.join(args.save_dir, 'se.pkl')))
+    # channelModel.load_state_dict(torch.load(os.path.join(args.save_dir, 'channel.pkl')))
+    checkpoints = torch.load(args.ckpt_path)
+    sentenceEncoder.load_state_dict(checkpoints["se_state_dict"])
+    channelModel.load_state_dict(checkpoints["channel_state_dict"])
 
     valid_count = 0
     Rouge_list, Rouge155_list = [], []
@@ -109,119 +114,138 @@ def genSentences(args):
     Rouge155_obj = Rouge155(stem=True, tmp=".tmp")
     best_rouge1_arr = []
     redundancy_arr = []
+
+    ref_dir = os.path.join(args.save_dir, "ref")
+    sum_dir = os.path.join(args.save_dir, "sum")
+
     for batch_iter, valid_batch in tqdm(enumerate(data.gen_test_minibatch()), total=data.test_size):
         # print(valid_count)
-        sentenceEncoder.eval();
-        channelModel.eval()
-        doc, sums, doc_len, sums_len = recursive_to_device(device, *valid_batch)
-        num_sent_of_sum = sums[0].size(0)
-        D = sentenceEncoder(doc, doc_len)
-        S = sentenceEncoder(sums[0], sums_len[0])
-        l = D.size(0)
-        doc_matrix = doc.cpu().data.numpy()
-        doc_len_arr = doc_len.cpu().data.numpy()
-        golden_summ_matrix = sums[0].cpu().data.numpy()
-        golden_summ_len_arr = sums_len[0].cpu().data.numpy()
+        with torch.no_grad():
+            sentenceEncoder.eval()
+            channelModel.eval()
+            doc, sums, doc_len, sums_len = recursive_to_device(device, *valid_batch)
+            num_sent_of_sum = sums[0].size(0)
+            D = sentenceEncoder(doc, doc_len)
+            S = sentenceEncoder(sums[0], sums_len[0])
+            l = D.size(0)
+            doc_matrix = doc.cpu().data.numpy()
+            doc_len_arr = doc_len.cpu().data.numpy()
+            golden_summ_matrix = sums[0].cpu().data.numpy()
+            golden_summ_len_arr = sums_len[0].cpu().data.numpy()
 
-        candidate_indexes = [i for i in range(len(doc_len_arr)) if doc_len_arr[i] >= 0 and doc_len_arr[i] <= 10000]
+            candidate_indexes = [i for i in range(len(doc_len_arr))
+                                 if (0 <= doc_len_arr[i] <= 10000)]
 
-        if (len(candidate_indexes) < 3):
-            continue
+            if len(candidate_indexes) < 3:
+                continue
 
-        doc_ = ""
-        doc_arr = []
-        for i in range(np.shape(doc_matrix)[0]):
-            temp_sent = " ".join([data.itow[x] for x in doc_matrix[i]][:doc_len_arr[i]])
-            doc_ += str(i) + ": " + temp_sent + "\n\n"
-            doc_arr.append(temp_sent)
+            doc_ = ""
+            doc_arr = []
+            for i in range(np.shape(doc_matrix)[0]):
+                temp_sent = " ".join([data.itow[x] for x in doc_matrix[i]][:doc_len_arr[i]])
+                doc_ += str(i) + ": " + temp_sent + "\n\n"
+                doc_arr.append(temp_sent)
 
-        golden_summ_ = ""
-        golden_summ_arr = []
-        for i in range(np.shape(golden_summ_matrix)[0]):
-            temp_sent = " ".join([data.itow[x] for x in golden_summ_matrix[i]][:golden_summ_len_arr[i]])
-            golden_summ_ += str(i) + ": " + temp_sent + "\n\n"
-            golden_summ_arr.append(temp_sent)
-        selected_indexs = []
+            golden_summ_ = ""
+            golden_summ_arr = []
+            for i in range(np.shape(golden_summ_matrix)[0]):
+                temp_sent = " ".join([data.itow[x] for x in golden_summ_matrix[i]][:golden_summ_len_arr[i]])
+                golden_summ_ += str(i) + ": " + temp_sent + "\n\n"
+                golden_summ_arr.append(temp_sent)
+            selected_indexs = []
 
-        if args.method == 'iterative':
-            for _ in range(3):
-                probs = np.zeros([l]) - 100000
-                for i in candidate_indexes:
-                    temp = [D[x] for x in selected_indexs]
-                    temp.append(D[i])
-                    temp_prob, addition = channelModel(D, torch.stack(temp))
-                    probs[i] = temp_prob.item()
-                best_index = np.argmax(probs)
-                while (best_index in selected_indexs):
-                    probs[best_index] = - 100000
+            if args.method == 'iterative':
+                for _ in range(3):
+                    probs = np.zeros([l]) - 100000
+                    for i in candidate_indexes:
+                        temp = [D[x] for x in selected_indexs]
+                        temp.append(D[i])
+                        temp_prob, addition = channelModel(D, torch.stack(temp))
+                        probs[i] = temp_prob.item()
                     best_index = np.argmax(probs)
-                selected_indexs.append(best_index)
-            _, addition = channelModel(D, S)
-            selected_indexs.sort()
-        if (args.method == 'iterative-delete'):
-            current_sent_set = range(l)
-            best_index = -1
-            doc_rouge_matrix = rouge_atten_matrix(doc_arr, doc_arr)
-            for i_ in range(num_sent_of_sum):
-                D_ = torch.stack([D[x] for x in current_sent_set])
+                    while best_index in selected_indexs:
+                        probs[best_index] = - 100000
+                        best_index = np.argmax(probs)
+                    selected_indexs.append(best_index)
+                _, addition = channelModel(D, S)
+                selected_indexs.sort()
+
+            if args.method == 'iterative-delete':
+                current_sent_set = range(l)
+                best_index = -1
+                doc_rouge_matrix = rouge_atten_matrix(doc_arr, doc_arr)
+                for i_ in range(num_sent_of_sum):
+                    D_ = torch.stack([D[x] for x in current_sent_set])
+                    probs = []
+                    print(i_, current_sent_set)
+                    for i in current_sent_set:
+                        temp_prob, addition = channelModel(D_, torch.stack([D[i]]))
+                        probs.append(temp_prob.item())
+                    best_index = np.argmax(probs)
+                    print(current_sent_set[best_index])
+                    selected_indexs.append(current_sent_set[best_index])
+                    temp = []
+                    for i in current_sent_set:
+                        if doc_rouge_matrix[current_sent_set[best_index], i] < 0.9:
+                            temp.append(i)
+                    if len(temp) == 0:
+                        break
+                    current_sent_set = temp
+
+            probs_arr = []
+            if args.method == 'top-k-simple':
+                for i in range(l):
+                    temp_prob, addition = channelModel(D, torch.stack([D[i]]))
+                    probs_arr.append(temp_prob.item())
+                for _ in range(3):
+                    best_index = np.argmax(probs_arr)
+                    probs_arr[best_index] = - 1000000
+                    selected_indexs.append(best_index)
+
+            if args.method == 'top-k':
+                k_subset = genSubset(range(l), 3)
                 probs = []
-                print(i_, current_sent_set)
-                for i in current_sent_set:
-                    temp_prob, addition = channelModel(D_, torch.stack([D[i]]))
+                for subset in k_subset:
+                    temp_prob, addition = channelModel(D, torch.stack([D[i] for i in subset]))
                     probs.append(temp_prob.item())
-                best_index = np.argmax(probs)
-                print(current_sent_set[best_index])
-                selected_indexs.append(current_sent_set[best_index])
-                temp = []
-                for i in current_sent_set:
-                    if (doc_rouge_matrix[current_sent_set[best_index], i] < 0.9):
-                        temp.append(i)
-                if (len(temp) == 0):
-                    break
-                current_sent_set = temp
+                index = np.argmax(probs)
+                selected_indexs = k_subset[index]
 
-        probs_arr = []
-        if args.method == 'top-k-simple':
-            for i in range(l):
-                temp_prob, addition = channelModel(D, torch.stack([D[i]]))
-                probs_arr.append(temp_prob.item())
-            for _ in range(3):
-                best_index = np.argmax(probs_arr)
-                probs_arr[best_index] = - 1000000
-                selected_indexs.append(best_index)
+            if args.method == 'random':
+                selected_indexs = random.sample(range(l), min(3, l))
 
-        if args.method == 'top-k':
-            k_subset = genSubset(range(l), 3)
-            probs = []
-            for subset in k_subset:
-                temp_prob, addition = channelModel(D, torch.stack([D[i] for i in subset]))
-                probs.append(temp_prob.item())
-            index = np.argmax(probs)
-            selected_indexs = k_subset[index]
+            summ_matrix = torch.stack([doc[x] for x in selected_indexs]).cpu().data.numpy()
+            summ_len_arr = torch.stack([doc_len[x] for x in selected_indexs]).cpu().data.numpy()
 
-        if args.method == 'random':
-            selected_indexs = random.sample(range(l), min(3, l))
+            summ_ = ""
+            summ_arr = []
+            for i in range(np.shape(summ_matrix)[0]):
+                temp_sent = " ".join([data.itow[x] for x in summ_matrix[i]][:summ_len_arr[i]])
+                summ_ += str(i) + ": " + temp_sent + "\n\n"
+                summ_arr.append(temp_sent)
+            # f_ref = open("ref/" + str(batch_iter) + "_reference.txt", "w")
 
-        summ_matrix = torch.stack([doc[x] for x in selected_indexs]).cpu().data.numpy()
-        summ_len_arr = torch.stack([doc_len[x] for x in selected_indexs]).cpu().data.numpy()
+            ref_path = os.path.join(ref_dir, "{}_reference.txt".format(batch_iter))
+            f_ref = open(ref_path, "w")
 
-        summ_ = ""
-        summ_arr = []
-        for i in range(np.shape(summ_matrix)[0]):
-            temp_sent = " ".join([data.itow[x] for x in summ_matrix[i]][:summ_len_arr[i]])
-            summ_ += str(i) + ": " + temp_sent + "\n\n"
-            summ_arr.append(temp_sent)
-        f_ref = open("ref/" + str(batch_iter) + "_reference.txt", "w")
-        f_sum = open("sum/" + str(batch_iter) + "_decoded.txt", "w")
-        f_ref.write("\n".join(golden_summ_arr))
-        f_sum.write("\n".join(summ_arr))
+            sum_path = os.path.join(sum_dir, "{}_reference.txt".format(batch_iter))
+            f_sum = open(sum_path, "w")
+
+            f_ref.write("\n".join(golden_summ_arr))
+            f_sum.write("\n".join(summ_arr))
+
+            f_ref.close()
+            f_sum.close()
+
     print('=' * 60)
-    total_score = Rouge155_obj.evaluate_folder("./sum", "./ref")
+
+    total_score = Rouge155_obj.evaluate_folder(sum_dir, ref_dir)
     print(total_score)
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--ckpt_path', type=str, help='checkpoint path')
     parser.add_argument('--SE_type', default='BiGRU', choices=['GRU', 'BiGRU', 'LSTM', 'BiLSTM', 'AVG'])
     parser.add_argument('--method', default='iterative',
                         choices=['random', 'top-k-simple', 'top-k', 'iterative', 'iterative-delete', 'lead-3'])
@@ -231,7 +255,7 @@ def parse_args():
     parser.add_argument('--cpu', action='store_true')
     parser.add_argument('--data_path', required=True,
                         help='pickle file obtained by dataset dump or datadir for torchtext')
-    parser.add_argument('--save_dir', type=str, help='path to save checkpoints and logs')
+    parser.add_argument('--save_dir', type=str, help='dir save evaluate')
     args = parser.parse_args()
     return args
 
@@ -239,6 +263,7 @@ def parse_args():
 def prepare():
     args = parse_args()
     args.cuda = not args.cpu
+    args.save_dir = os.path.join(args.save_dir, my_utils.get_time_str())
 
     fileHandler = logging.FileHandler(os.path.join(args.save_dir, 'examples.log'))
     fileHandler.setFormatter(logFormatter)
