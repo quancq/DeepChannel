@@ -255,6 +255,7 @@ def parse_args():
                         choices=['random', 'top-k-simple', 'top-k', 'iterative', 'iterative-delete', 'lead-3'])
     parser.add_argument('--word_dim', type=int, default=300, help='dimension of word embeddings')
     parser.add_argument('--hidden_dim', type=int, default=1024, help='dimension of hidden units per layer')
+    parser.add_argument('--dropout', type=float, default=0.3)
     parser.add_argument('--num_layers', type=int, default=1, help='number of layers in LSTM/BiLSTM')
     parser.add_argument('--cpu', action='store_true')
     parser.add_argument('--save_dir', default="./eval", type=str, help='dir save evaluate')
