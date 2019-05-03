@@ -78,7 +78,7 @@ def genSentences(args):
     data = Dataset(path=args.data_path)
 
     print('Building model......')
-    # args.num_words = len(data.weight)  # number of words
+    args.num_words = len(data.weight)  # number of words, use to init word embedding
 
     sentenceEncoder = SentenceEmbedding(**vars(args))
     args.se_dim = sentenceEncoder.getDim()  # sentence embedding dim
