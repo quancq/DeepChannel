@@ -255,7 +255,7 @@ def parse_args():
     parser.add_argument('--cpu', action='store_true')
     parser.add_argument('--data_path', required=True,
                         help='pickle file obtained by dataset dump or datadir for torchtext')
-    parser.add_argument('--save_dir', type=str, help='dir save evaluate')
+    parser.add_argument('--save_dir', delault="./eval", type=str, help='dir save evaluate')
     args = parser.parse_args()
     return args
 
