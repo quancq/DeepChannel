@@ -17,7 +17,7 @@ from collections import Counter
 import xml.etree.ElementTree as et
 
 import my_utils
-from my_utils import load_glove_gensim
+from my_utils import load_we_gensim
 from dataset.data import Dataset
 
 pattern_of_num = re.compile(r'[0-9]+')
@@ -217,19 +217,19 @@ def main():
 
     print("Original vocab size  : ", org_vocab_size)
     print("Number removed words : ", num_removed_words)
-    print('Loading glove......')
+    print('Loading word embedding ......')
     # glove = pickle.load(open(args.glove, 'rb'))
-    glove = load_glove_gensim(args.glove)
+    we = load_we_gensim(args.we_path)
 
-    print("Number words in glove : ", glove.syn0.shape[0])
-    word_dim = len(glove['the'])
+    print("Number words in word embedding : ", we.syn0.shape[0])
+    word_dim = len(we['the'])
     print('Word dim = %d' % word_dim)
 
     itow = ['<pad>', '<unk>']
     wtoi = {'<pad>': 0, '<unk>': 1}
     count = 2
-    glove['<pad>'] = np.zeros((word_dim,))
-    glove['<unk>'] = np.zeros((word_dim,))
+    we['<pad>'] = np.zeros((word_dim,))
+    we['<unk>'] = np.zeros((word_dim,))
     missing_word_neighbors = {}
 
     print('Replace word string with word index and padding zero......')
@@ -271,13 +271,13 @@ def main():
                             # print(word)
                             data[i][j][k][l][m] = wtoi[word]                # convert text to index
 
-                            # Find neighbor vectors for those words not in glove
-                            if word not in glove:
+                            # Find neighbor vectors for those words not in word embedding
+                            if word not in we:
                                 if word not in missing_word_neighbors:
                                     missing_word_neighbors[word] = []
                                 for neighbor in data[i][j][k][l][m - 5:m + 6]:  # window size: 10
-                                    if neighbor in glove:
-                                        missing_word_neighbors[word].append(glove[neighbor])
+                                    if neighbor in we:
+                                        missing_word_neighbors[word].append(we[neighbor])
 
                         if max_len > len(data[i][j][k][l]):
                             data[i][j][k][l] += [0] * int(max_len - len(data[i][j][k][l]))  # padding l-th sentence
@@ -296,10 +296,10 @@ def main():
         for word in missing_word_neighbors:
             vectors = missing_word_neighbors[word]
             if len(vectors) > 0:
-                glove[word] = sum(vectors) / len(vectors)
+                we[word] = sum(vectors) / len(vectors)
             else:
-                glove[word] = np.zeros((word_dim,))
-        weight_matrix = np.vstack([glove[w] for w in itow])
+                we[word] = np.zeros((word_dim,))
+        weight_matrix = np.vstack([we[w] for w in itow])
     print('Shape of weight matrix:')
     print(weight_matrix.shape)
 

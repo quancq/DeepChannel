@@ -217,7 +217,7 @@ def convert_glove_to_word2vec(glove_path, save_path):
     print("Convert glove -> word2vec done. Save word2vec to ", save_path)
 
 
-def load_glove_gensim(path):
+def load_we_gensim(path):
     glove = KeyedVectors.load_word2vec_format(path, binary=False)
     return glove
 
