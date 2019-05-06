@@ -191,8 +191,8 @@ def copy_files(src_dst_paths):
     total_paths = len(src_dst_paths)
     num_success = 0
     for i, (src_path, dst_path) in enumerate(src_dst_paths):
-        if (i+1) % 10 == 0:
-            print("Copying {}/{} ...".format(i+1, total_paths))
+        if (i + 1) % 10 == 0:
+            print("Copying {}/{} ...".format(i + 1, total_paths))
         is_success = copy_file(src_path, dst_path)
         if is_success:
             num_success += 1
@@ -222,55 +222,17 @@ def load_we_gensim(path):
     return glove
 
 
-# def save_log(log_save_folder, log):
-#     # Save log
-#     # best_valid_epochs.append(dict(Epoch=best_valid_epoch, Total_Loss=min_valid_loss))
-#     # log["Best_Valid_Epochs"] = best_valid_epochs
-#     save_json_path = os.path.join(log_save_folder, "log.txt")
-#     save_json(log, save_json_path)
-#
-#     save_csv_path = os.path.join(log_save_folder, "log.csv")
-#     cols = ["Epoch",
-#             "Train_Localization_Loss", "Train_Classification_Loss", "Train_Total_Loss", "Train_Time",
-#             "Valid_Localization_Loss", "Valid_Classification_Loss", "Valid_Total_Loss", "Valid_Time"]
-#     df = []
-#     epoch_list = list(log["Train"]["time"].keys())
-#     # epoch_ints = [int(e) for e in epoch_ints]
-#     for epoch_id in sorted(epoch_list):
-#         # epoch_id = str(epoch_id)
-#         train_localization_loss = np.mean(log["Train"]["localization_loss"][epoch_id])
-#         train_classification_loss = np.mean(log["Train"]["classification_loss"][epoch_id])
-#         train_total_loss = np.mean(log["Train"]["total_loss"][epoch_id])
-#         train_time = log["Train"]["time"][epoch_id]
-#
-#         try:
-#             valid_localization_loss = np.mean(log["Valid"]["localization_loss"].get(epoch_id))
-#             valid_classification_loss = np.mean(log["Valid"]["classification_loss"].get(epoch_id))
-#             valid_total_loss = np.mean(log["Valid"]["total_loss"].get(epoch_id))
-#             valid_time = log["Valid"]["time"].get(epoch_id)
-#         except:
-#             valid_localization_loss = 0
-#             valid_classification_loss = 0
-#             valid_total_loss = 0
-#             valid_time = 0
-#
-#         df.append((int(epoch_id),
-#                    "{:.4f}".format(train_localization_loss),
-#                    "{:.4f}".format(train_classification_loss),
-#                    "{:.4f}".format(train_total_loss),
-#                    "{:.2f}".format(train_time),
-#                    "{:.4f}".format(valid_localization_loss),
-#                    "{:.4f}".format(valid_classification_loss),
-#                    "{:.4f}".format(valid_total_loss),
-#                    "{:.2f}".format(valid_time)
-#                    ))
-#
-#     df.sort(key=lambda x: x[0])
-#     df = pd.DataFrame(df, columns=cols)
-#     save_csv(df, save_csv_path)
-#
-#     plot_loss(df, log_save_folder)
+def convert_word2vec_bin_to_text(bin_path, txt_path):
+    model = KeyedVectors.load_word2vec_format(bin_path, binary=True)
+    model.save_word2vec_format(txt_path, binary=False)
+    print("Convert word2vec bin -> txt done. Save word2vec to ", txt_path)
 
 
 if __name__ == "__main__":
     pass
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--bin_path', required=True, type=str, help='word2vec bin path')
+    parser.add_argument('--txt_path', required=True, type=str, help='word2vec txt path')
+    args = parser.parse_args()
+
+    convert_word2vec_bin_to_text(args.bin_path, args.txt_path)
