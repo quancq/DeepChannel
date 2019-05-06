@@ -230,7 +230,7 @@ def genSentences(args):
             ref_path = os.path.join(ref_dir, "{}_reference.txt".format(batch_iter))
             f_ref = open(ref_path, "w")
 
-            sum_path = os.path.join(sum_dir, "{}_reference.txt".format(batch_iter))
+            sum_path = os.path.join(sum_dir, "{}_decoded.txt".format(batch_iter))
             f_sum = open(sum_path, "w")
 
             f_ref.write("\n".join(golden_summ_arr))
