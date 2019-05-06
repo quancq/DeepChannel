@@ -132,7 +132,8 @@ def trainChannelModel(args):
         # channelModel.load_state_dict(torch.load(os.path.join(args.save_dir, 'channel.pkl')))
     else:
         print('Initializing word embeddings......')
-        sentenceEncoder.word_embedding.weight.data.set_(data.weight)
+        weight = torch.from_numpy(data.weight).float().to(device)
+        sentenceEncoder.word_embedding.weight.data.set_(weight)
 
     if args.fix_word_embedding:
         sentenceEncoder.word_embedding.weight.requires_grad = False
