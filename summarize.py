@@ -121,6 +121,7 @@ def genSentences(args):
     my_utils.make_dirs(ref_dir)
     sum_dir = os.path.join(args.save_dir, "sum")
     my_utils.make_dirs(sum_dir)
+    max_num_summ_sents = args.max_num_summ_sents
 
     for batch_iter, valid_batch in tqdm(enumerate(data.gen_test_minibatch()), total=data.test_size):
 
@@ -163,7 +164,7 @@ def genSentences(args):
             selected_indexs = []
 
             if args.method == 'iterative':
-                for _ in range(3):
+                for _ in range(max_num_summ_sents):
                     probs = np.zeros([l]) - 100000
                     for i in candidate_indexes:
                         temp = [D[x] for x in selected_indexs]
@@ -205,13 +206,13 @@ def genSentences(args):
                 for i in range(l):
                     temp_prob, addition = channelModel(D, torch.stack([D[i]]))
                     probs_arr.append(temp_prob.item())
-                for _ in range(3):
+                for _ in range(max_num_summ_sents):
                     best_index = np.argmax(probs_arr)
                     probs_arr[best_index] = - 1000000
                     selected_indexs.append(best_index)
 
             if args.method == 'top-k':
-                k_subset = genSubset(range(l), 3)
+                k_subset = genSubset(range(l), max_num_summ_sents)
                 probs = []
                 for subset in k_subset:
                     temp_prob, addition = channelModel(D, torch.stack([D[i] for i in subset]))
@@ -220,7 +221,7 @@ def genSentences(args):
                 selected_indexs = k_subset[index]
 
             if args.method == 'random':
-                selected_indexs = random.sample(range(l), min(3, l))
+                selected_indexs = random.sample(range(l), min(max_num_summ_sents, l))
 
             summ_matrix = torch.stack([doc[x] for x in selected_indexs]).cpu().data.numpy()
             summ_len_arr = torch.stack([doc_len[x] for x in selected_indexs]).cpu().data.numpy()
@@ -268,6 +269,7 @@ def parse_args():
     parser.add_argument('--dropout', type=float, default=0.3)
     parser.add_argument('--num_layers', type=int, default=1, help='number of layers in LSTM/BiLSTM')
     parser.add_argument('--max_test_docs', type=int, default=-1, help='max test docs')
+    parser.add_argument('--max_num_summ_sents', type=int, default=3, help='max number summary sentences')
     parser.add_argument('--cpu', action='store_true')
     parser.add_argument('--save_org_doc', action='store_true')
     parser.add_argument('--save_dir', default="./eval", type=str, help='dir save evaluate')
