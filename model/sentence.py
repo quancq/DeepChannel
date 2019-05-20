@@ -104,7 +104,7 @@ class RNN_wrapper(nn.Module):
         if rnn_type == "GRU":
             rnn = nn.GRU
         elif rnn_type == "LSTM":
-            rnn == nn.LSTM
+            rnn = nn.LSTM
         else:
             raise "Rnn type {} is not valid".format(rnn_type)
 
