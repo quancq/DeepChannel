@@ -115,12 +115,18 @@ def genSentences(args):
     best_rouge1_arr = []
     redundancy_arr = []
 
+    doc_dir = os.path.join(args.save_dir, "doc")
+    my_utils.make_dirs(doc_dir)
     ref_dir = os.path.join(args.save_dir, "ref")
     my_utils.make_dirs(ref_dir)
     sum_dir = os.path.join(args.save_dir, "sum")
     my_utils.make_dirs(sum_dir)
 
     for batch_iter, valid_batch in tqdm(enumerate(data.gen_test_minibatch()), total=data.test_size):
+
+        if 0 < args.max_test_docs < batch_iter:
+            break
+
         # print(valid_count)
         with torch.no_grad():
             sentenceEncoder.eval()
@@ -226,6 +232,10 @@ def genSentences(args):
                 summ_ += str(i) + ": " + temp_sent + "\n\n"
                 summ_arr.append(temp_sent)
             # f_ref = open("ref/" + str(batch_iter) + "_reference.txt", "w")
+            if args.save_org_doc:
+                doc_path = os.path.join(doc_dir, "{}_original_doc.txt".format(batch_iter))
+                with open(doc_path, "w") as f_doc:
+                    f_doc.write("\n".join(doc_arr))
 
             ref_path = os.path.join(ref_dir, "{}_reference.txt".format(batch_iter))
             f_ref = open(ref_path, "w")
@@ -257,7 +267,9 @@ def parse_args():
     parser.add_argument('--hidden_dim', type=int, default=1024, help='dimension of hidden units per layer')
     parser.add_argument('--dropout', type=float, default=0.3)
     parser.add_argument('--num_layers', type=int, default=1, help='number of layers in LSTM/BiLSTM')
+    parser.add_argument('--max_test_docs', type=int, default=-1, help='max test docs')
     parser.add_argument('--cpu', action='store_true')
+    parser.add_argument('--save_org_doc', action='store_true')
     parser.add_argument('--save_dir', default="./eval", type=str, help='dir save evaluate')
     args = parser.parse_args()
     return args
