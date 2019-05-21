@@ -145,7 +145,7 @@ def genSentences(args):
             candidate_indexes = [i for i in range(len(doc_len_arr))
                                  if (0 <= doc_len_arr[i] <= 10000)]
 
-            if len(candidate_indexes) < 3:
+            if len(candidate_indexes) < max_num_summ_sents:
                 continue
 
             doc_ = ""
